@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+    <title>🧾 QR Bill Generator + Scanner Pro</title>
+
+    <!-- CDN Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
+    </script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js">
+    </script>
+
+    <style>
+        /* ───── RESET & ROOT ───── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        :root {
+            --primary: #0984e3;
+            --primary-light: #74b9ff;
+            --primary-dark: #0652DD;
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text: #2d3436;
+            --text-light: #636e72;
+            --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            --radius: 16px;
+            --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            --green: #00b894;
+            --red: #ff6b6b;
+            --orange: #fdcb6e;
+            --whatsapp: #25D366;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .app {
+            max-width: 780px;
+            width: 100%;
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px 16px 24px;
+        }
+
+        /* ───── HEADER ───── */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .app-header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), #6c5ce7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.3px;
+        }
+        .app-header .badge {
+            font-size: 12px;
+            background: var(--bg);
+            padding: 4px 14px;
+            border-radius: 30px;
+            color: var(--text-light);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        /* ───── TABS ───── */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg);
+            padding: 4px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px 6px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: 0.25s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(9, 132, 227, 0.25);
+        }
+        .tab-btn:hover:not(.active) {
+            background: rgba(9, 132, 227, 0.08);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeUp 0.3s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tab-content h2 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--primary-dark);
+        }
+
+        /* ───── FORMS ───── */
+        .form-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .form-row input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 14px;
+            background: #fafbfc;
+            min-width: 110px;
+            transition: 0.2s;
+        }
+        .form-row input:focus {
+            border-color: var(--primary);
+            outline: none;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(9, 132, 227, 0.12);
+        }
+
+        /* ───── BUTTONS ───── */
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: center;
+            user-select: none;
+            white-space: nowrap;
+        }
+        .btn:active {
+            transform: scale(0.97);
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            box-shadow: 0 4px 12px rgba(9, 132, 227, 0.3);
+        }
+        .btn-success {
+            background: var(--green);
+            color: #fff;
+        }
+        .btn-success:hover {
+            background: #00a884;
+        }
+        .btn-danger {
+            background: var(--red);
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #e55a5a;
+        }
+        .btn-whatsapp {
+            background: var(--whatsapp);
+            color: #fff;
+        }
+        .btn-whatsapp:hover {
+            background: #1da85c;
+        }
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 1.5px solid var(--primary);
+        }
+        .btn-outline:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .btn-bt {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        .btn-bt:hover {
+            background: #2d2d44;
+            box-shadow: 0 4px 12px rgba(26, 26, 46, 0.3);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* ───── QR DISPLAY ───── */
+        .qr-display {
+            text-align: center;
+            padding: 10px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #qrcode {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 12px;
+            background: #fff;
+            display: inline-block;
+            min-height: 180px;
+            min-width: 180px;
+            transition: 0.3s;
+        }
+        #qrcode canvas,
+        #qrcode img {
+            display: block !important;
+            margin: 0 auto;
+        }
+        .qr-data {
+            background: #f8f9fa;
+            padding: 8px 16px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--text-light);
+            max-width: 100%;
+            word-break: break-all;
+        }
+
+        .qr-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* ───── SCANNER ───── */
+        #scanner-container {
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            min-height: 200px;
+            position: relative;
+        }
+        #scanner-container #reader {
+            width: 100%;
+            min-height: 200px;
+        }
+        #scanner-container video {
+            width: 100% !important;
+            height: auto !important;
+            display: block;
+        }
+        .scanner-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .scanner-status {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 12px;
+            font-weight: 600;
+            padding: 6px 14px;
+            background: var(--bg);
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        /* ───── BILL SECTION ───── */
+        .bill-section {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 14px;
+            border: 1px solid #e9ecef;
+            margin-top: 4px;
+        }
+        .bill-header-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-light);
+            border-bottom: 1px dashed #e9ecef;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .bill-header-info strong {
+            color: var(--text);
+        }
+
+        .bill-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f2f5;
+            font-size: 14px;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .bill-item .item-info {
+            flex: 1;
+            min-width: 100px;
+        }
+        .bill-item .item-info strong {
+            display: block;
+            font-size: 14px;
+        }
+        .bill-item .item-info small {
+            color: var(--text-light);
+            font-size: 12px;
+        }
+        .item-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .qty-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg);
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+        .qty-btn {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--primary);
+            font-size: 16px;
+            padding: 0 4px;
+            line-height: 1.4;
+        }
+        .qty-btn:hover {
+            color: var(--primary-dark);
+        }
+        .del-btn {
+            background: none;
+            border: none;
+            color: var(--red);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 4px;
+        }
+        .del-btn:hover {
+            color: #e55a5a;
+        }
+
+        .bill-total {
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+            font-weight: 700;
+            padding-top: 10px;
+            margin-top: 8px;
+            border-top: 2px solid var(--primary);
+        }
+        .bill-total .total-amount {
+            color: var(--green);
+        }
+
+        .whatsapp-box {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed #e9ecef;
+            flex-wrap: wrap;
+        }
+        .whatsapp-box input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1.5px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 13px;
+            min-width: 150px;
+        }
+        .whatsapp-box input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .bill-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .bill-actions .btn {
+            flex: 1;
+            min-width: 80px;
+        }
+
+        .empty-bill {
+            text-align: center;
+            color: var(--text-light);
+            padding: 20px 0;
+            font-size: 13px;
+        }
+
+        /* ───── TOAST ───── */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: #2d3436;
+            color: #fff;
+            padding: 12px 28px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.35s ease, transform 0.35s ease;
+            z-index: 999;
+            pointer-events: none;
+            max-width: 92%;
+            text-align: center;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .toast.success {
+            background: var(--green);
+        }
+        .toast.error {
+            background: var(--red);
+        }
+        .toast.info {
+            background: var(--primary);
+        }
+        .toast.warning {
+            background: var(--orange);
+            color: #2d3436;
+        }
+
+        /* ───── PRINT STYLES (Thermal Receipt / Label) ───── */
+        @media print {
+            @page {
+                size: 58mm auto;
+                margin: 2mm 3mm;
+            }
+
+            html,
+            body {
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #fff !important;
+                font-size: 9pt !important;
+                font-family: 'Courier New', monospace !important;
+            }
+
+            .app,
+            .bill-section,
+            #print-area {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                background: #fff !important;
+            }
+
+            .bill-item {
+                font-size: 9pt !important;
+                padding: 4px 0 !important;
+                border-bottom: 1px dashed #ccc !important;
+            }
+            .bill-item .item-info strong {
+                font-size: 9pt !important;
+            }
+            .bill-item .item-info small {
+                font-size: 8pt !important;
+            }
+
+            .bill-header-info {
+                font-size: 9pt !important;
+                border-bottom: 1px dashed #000 !important;
+                color: #000 !important;
+            }
+            .bill-header-info strong {
+                color: #000 !important;
+            }
+
+            .bill-total {
+                font-size: 11pt !important;
+                border-top: 2px dashed #000 !important;
+                margin-top: 6px !important;
+                padding-top: 6px !important;
+            }
+            .bill-total .total-amount {
+                color: #000 !important;
+            }
+
+            .app-header h1 {
+                font-size: 14pt !important;
+                font-weight: bold !important;
+                text-align: center !important;
+                background: none !important;
+                -webkit-text-fill-color: #000 !important;
+                color: #000 !important;
+            }
+
+            /* Hide UI */
+            .no-print,
+            button,
+            .tabs,
+            #scanner-container,
+            .scanner-controls,
+            .scanner-status,
+            .whatsapp-box,
+            .bill-actions,
+            .app-header .badge,
+            .qr-display,
+            .form-row,
+            .qr-actions,
+            .btn,
+            input:not(.no-print) {
+                display: none !important;
+            }
+
+            .bill-item .item-actions .qty-controls,
+            .bill-item .item-actions .del-btn,
+            .bill-item .item-actions .qty-btn {
+                display: none !important;
+            }
+
+            .bill-item .item-actions strong {
+                display: inline-block !important;
+            }
+        }
+
+        /* ───── RESPONSIVE ───── */
+        @media (max-width: 500px) {
+            .form-row {
+                flex-direction: column;
+            }
+            .bill-actions {
+                flex-direction: column;
+            }
+            .bill-actions .btn {
+                width: 100%;
+            }
+            .whatsapp-box {
+                flex-direction: column;
+            }
+            .whatsapp-box .btn {
+                width: 100%;
+            }
+            .app-header h1 {
+                font-size: 18px;
+            }
+            .tab-btn {
+                font-size: 12px;
+                padding: 8px 4px;
+            }
+            .bill-actions .btn {
+                flex: 1 1 100%;
+            }
+            .qr-actions .btn {
+                flex: 1;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .app {
+                padding: 12px 10px;
+            }
+            .tab-btn {
+                font-size: 11px;
+                padding: 6px 2px;
+            }
+            .tab-btn span {
+                display: none;
+            }
+        }
+
+        /* ───── UTILITY ───── */
+        .mt-8 {
+            margin-top: 8px;
+        }
+        .mb-8 {
+            margin-bottom: 8px;
+        }
+        .flex-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .gap-8 {
+            gap: 8px;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .w-full {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ─── TOAST ─── -->
+    <div id="toast" class="toast"></div>
+
+    <!-- ─── APP ─── -->
+    <div class="app" id="app">
+
+        <!-- HEADER -->
+        <div class="app-header">
+            <h1>🧾 QR Bill Pro</h1>
+            <span class="badge" id="scanCount">0 आइटम</span>
+        </div>
+
+        <!-- TABS -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="generate">📱 QR बनाएँ</button>
+            <button class="tab-btn" data-tab="scan">📷 स्कैन &amp; बिल</button>
+        </div>
+
+        <!-- ─── TAB 1: GENERATOR ─── -->
+        <div class="tab-content active" id="tab-generate">
+            <h2>📱 QR कोड जनरेटर</h2>
+            <div class="form-row">
+                <input type="text" id="shopName" placeholder="दुकान का नाम" value="मेरी दुकान" />
+                <input type="text" id="productName" placeholder="उत्पाद का नाम" value="चाय" />
+                <input type="number" id="productPrice" placeholder="मूल्य (₹)" value="20" step="0.01" min="0" />
+                <button class="btn btn-primary" id="generateQRBtn">✅ बनाएँ</button>
+            </div>
+            <div class="qr-display">
+                <div id="qrcode"></div>
+                <div class="qr-data" id="qrDataDisplay">कोई QR नहीं</div>
+            </div>
+            <div class="qr-actions">
+                <button class="btn btn-outline btn-sm" id="downloadQRBtn">⬇️ डाउनलोड</button>
+                <button class="btn btn-bt btn-sm" id="printLabelBtn">🏷️ लेबल प्रिंट (BLE)</button>
+            </div>
+            <p style="font-size:12px;color:var(--text-light);margin-top:6px;text-align:center;">
+                💡 लेबल प्रिंट के लिए Bluetooth प्रिंटर (TSPL) कनेक्ट करें
+            </p>
+        </div>
+
+        <!-- ─── TAB 2: SCANNER + BILL ─── -->
+        <div class="tab-content" id="tab-scan">
+            <h2>📷 स्कैन &amp; बिल</h2>
+
+            <div id="scanner-container">
+                <div id="reader" style="width:100%;"></div>
+            </div>
+
+            <div class="scanner-controls">
+                <button class="btn btn-success btn-sm" id="startScanBtn">📷 कैमरा</button>
+                <button class="btn btn-primary btn-sm" id="fileScanBtn">📸 फोटो</button>
+                <input type="file" id="qrFileInput" accept="image/*" style="display:none;" />
+                <button class="btn btn-danger btn-sm" id="stopScanBtn">⏹️ रोकें</button>
+            </div>
+            <div class="scanner-status" id="scannerStatus">⏸️ स्कैनर बंद है।</div>
+
+            <!-- Bill Area -->
+            <div class="bill-section" id="billSection">
+                <div class="bill-header-info">
+                    <span>📅 दिनांक: <strong id="billDate">-</strong></span>
+                    <span>🕒 समय: <strong id="billTime">-</strong></span>
+                </div>
+
+                <div id="billItems">
+                    <div class="empty-bill">कोई आइटम नहीं — उत्पाद स्कैन करें।</div>
+                </div>
+
+                <div class="bill-total">
+                    <span>कुल योग</span>
+                    <span class="total-amount" id="totalAmount">₹ 0.00</span>
+                </div>
+
+                <div class="whatsapp-box">
+                    <input type="tel" id="whatsappNum" placeholder="WhatsApp नंबर (जैसे 919876543210)" />
+                    <button class="btn btn-whatsapp btn-sm" id="shareWhatsappBtn">📲 WhatsApp</button>
+                </div>
+
+                <div class="bill-actions">
+                    <button class="btn btn-primary btn-sm" id="printBillBtn">🖨️ प्रिंट बिल</button>
+                    <button class="btn btn-bt btn-sm" id="printReceiptBLEBtn">📡 BLE रसीद</button>
+                    <button class="btn btn-outline btn-sm" id="clearBillBtn">🗑️ साफ़ करें</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════
+        //  1.  TOAST
+        // ═══════════════════════════════════════════════════════
+        const toastEl = document.getElementById('toast');
+        let toastTimer = null;
+
+        function showToast(msg, type = 'info', duration = 3000) {
+            if (toastTimer) { clearTimeout(toastTimer);
+                toastTimer = null; }
+            toastEl.textContent = msg;
+            toastEl.className = 'toast ' + type;
+            void toastEl.offsetWidth;
+            toastEl.classList.add('show');
+            toastTimer = setTimeout(() => {
+                toastEl.classList.remove('show');
+                toastTimer = null;
+            }, duration);
+        }
+
+        // ═══════════════════════════════════════════════════════
+        //  2.  TABS
+        // ═══════════════════════════════════════════════════════
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = {
+            generate: document.getElementById('tab-generate'),
+            scan: document.getElementById('tab-scan')
+        };
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const tab = btn.dataset.tab;
+                Object.keys(tabContents).forEach(k => {
+                    tabContents[k].classList.toggle('active', k === tab);
+                });
+                if (tab !== 'scan') {
+                    stopScanner();
+                } else {
+                    if (!html5QrCode) {
+                        try {
+                            html5QrCode = new Html5Qrcode("reader");
+                        } catch (_) { /* retry on start */ }
+                    }
+                }
+            });
+        });
+
+        // ═══════════════════════════════════════════════════════
+        //  3.  QR GENERATOR
+        // ═══════════════════════════════════════════════════════
+        const shopInput = document.getElementById('shopName');
+        const productInput = document.getElementById('productName');
+        const priceInput = document.getElementById('productPrice');
+        const qrContainer = document.getElementById('qrcode');
+        const qrDataDisplay = document.getElementById('qrDataDisplay');
+        let qrcodeObj = null;
+
+        function buildQRData() {
+            const shop = shopInput.value.trim() || 'दुकान';
+            const product = productInput.value.trim() || 'उत्पाद';
+            const price = parseFloat(priceInput.value);
+            if (isNaN(price) || price <= 0) {
+                showToast('कृपया सही मूल्य डालें (₹)', 'error');
+                return null;
+            }
+            return JSON.stringify({ shop, product, price: Math.round(price * 100) / 100 });
+        }
+
+        function generateQR() {
+            const data = buildQRData();
+            if (!data) return;
+            qrContainer.innerHTML = '';
+            try {
+                if (typeof QRCode === 'undefined') {
+                    showToast('QR लाइब्रेरी लोड नहीं हुई', 'error');
+                    return;
+                }
+                qrcodeObj = new QRCode(qrContainer, {
+                    text: data,
+                    width: 180,
+                    height: 180,
+                    colorDark: '#2d3436',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+                const parsed = JSON.parse(data);
+                qrDataDisplay.textContent = `${parsed.shop} | ${parsed.product} | ₹${parsed.price.toFixed(2)}`;
+                showToast('✅ QR कोड बन गया!', 'success', 1500);
+            } catch (e) {
+                console.error('QR Generate Error:', e);
+                showToast('⚠️ QR बनाने में त्रुटि', 'error');
+            }
+        }
+
+        document.getElementById('generateQRBtn').addEventListener('click', generateQR);
+
+        function initQR() {
+            if (typeof QRCode !== 'undefined') {
+                generateQR();
+            } else {
+                setTimeout(initQR, 500);
+            }
+        }
+        if (document.readyState === 'complete') {
+            setTimeout(initQR, 300);
+        } else {
+            window.addEventListener('load', () => setTimeout(initQR, 300));
+        }
+
+        // ── Download QR ──
+        document.getElementById('downloadQRBtn').addEventListener('click', () => {
+            const img = qrContainer.querySelector('img');
+            const canvas = qrContainer.querySelector('canvas');
+            let src = null;
+            if (img && img.src) { src = img.src; } else if (canvas) {
+                try { src = canvas.toDataURL('image/png'); } catch (_) {}
+            }
+            if (src) {
+                const a = document.createElement('a');
+                a.href = src;
+                a.download = (productInput.value.trim() || 'QR') + '_QR.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showToast('⬇️ QR डाउनलोड', 'success', 1500);
+            } else {
+                showToast('⚠️ पहले QR बनाएँ', 'error');
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════
+        //  4.  SCANNER & BILL
+        // ═══════════════════════════════════════════════════════
+        let html5QrCode = null;
+        let isScanning = false;
+        let scannedItems = [];
+
+        // Load from localStorage
+        try {
+            const stored = localStorage.getItem('qr_bill_items');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) scannedItems = parsed;
+            }
+        } catch (_) {}
+
+        const scannerStatus = document.getElementById('scannerStatus');
+
+        function saveAndRender() {
+            try {
+                localStorage.setItem('qr_bill_items', JSON.stringify(scannedItems));
+            } catch (_) {}
+            renderBill();
+        }
+
+        // ── Process QR ──
+        function processQRData(decodedText) {
+            try {
+                const data = JSON.parse(decodedText);
+                if (data && typeof data.shop === 'string' && typeof data.product === 'string' &&
+                    typeof data.price === 'number' && data.price > 0) {
+
+                    const price = Math.round(data.price * 100) / 100;
+                    const existing = scannedItems.find(i =>
+                        i.product === data.product && i.shop === data.shop
+                    );
+
+                    if (existing) {
+                        showToast(`⚠️ "${data.product}" पहले से है`, 'warning', 2000);
+                        scannerStatus.textContent = `⚠️ डुप्लिकेट: ${data.product}`;
+                        return;
+                    }
+
+                    scannedItems.push({
+                        shop: data.shop,
+                        product: data.product,
+                        price: price,
+                        qty: 1
+                    });
+                    saveAndRender();
+                    showToast(`✅ ${data.product} जोड़ा गया`, 'success', 1200);
+                    scannerStatus.textContent = `✅ ${data.product} (${data.shop})`;
+                } else {
+                    throw new Error('अमान्य डेटा');
+                }
+            } catch (e) {
+                scannerStatus.textContent = '⚠️ अमान्य QR!';
+                showToast('⚠️ यह QR बिल के लिए नहीं है', 'error', 2000);
+            }
+        }
+
+        // ── Scanner controls ──
+        function startScanner() {
+            if (isScanning) {
+                showToast('⚠️ स्कैनर चालू है', 'info', 1500);
+                return;
+            }
+            if (typeof Html5Qrcode === 'undefined') {
+                showToast('❌ लाइब्रेरी नहीं मिली', 'error');
+                return;
+            }
+            if (!html5QrCode) {
+                try {
+                    html5QrCode = new Html5Qrcode("reader");
+                } catch (e) {
+                    showToast('❌ स्कैनर init त्रुटि', 'error');
+                    return;
+                }
+            }
+            const config = { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 };
+            html5QrCode.start({ facingMode: "environment" }, config,
+                (text) => { processQRData(text); },
+                () => {}
+            ).then(() => {
+                isScanning = true;
+                scannerStatus.textContent = '📷 QR स्कैन करें';
+                showToast('📷 कैमरा चालू', 'info', 1500);
+            }).catch((err) => {
+                console.error('Camera error:', err);
+                scannerStatus.textContent = '⚠️ कैमरा नहीं खुला — फोटो से स्कैन करें';
+                showToast('⚠️ कैमरा एक्सेस ब्लॉक', 'error', 3000);
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrCode && isScanning) {
+                html5QrCode.stop().then(() => {
+                    isScanning = false;
+                    scannerStatus.textContent = '⏸️ कैमरा बंद है।';
+                }).catch(() => {
+                    isScanning = false;
+                    scannerStatus.textContent = '⏸️ कैमरा बंद है।';
+                });
+            } else {
+                isScanning = false;
+                scannerStatus.textContent = '⏸️ कैमरा बंद है।';
+            }
+        }
+
+        document.getElementById('startScanBtn').addEventListener('click', startScanner);
+        document.getElementById('stopScanBtn').addEventListener('click', stopScanner);
+
+        // ── File scan ──
+        document.getElementById('fileScanBtn').addEventListener('click', () => {
+            document.getElementById('qrFileInput').click();
+        });
+        document.getElementById('qrFileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (typeof Html5Qrcode === 'undefined') {
+                showToast('❌ लाइब्रेरी नहीं मिली', 'error');
+                return;
+            }
+            if (!html5QrCode) {
+                try {
+                    html5QrCode = new Html5Qrcode("reader");
+                } catch (err) {
+                    showToast('❌ स्कैनर init त्रुटि', 'error');
+                    return;
+                }
+            }
+            showToast('📸 स्कैन हो रहा है…', 'info', 2000);
+            html5QrCode.scanFile(file, true)
+                .then(decoded => {
+                    processQRData(decoded);
+                    e.target.value = '';
+                })
+                .catch(err => {
+                    console.warn('File scan error:', err);
+                    showToast('⚠️ QR नहीं मिला', 'error', 2500);
+                    scannerStatus.textContent = '⚠️ QR नहीं पहचाना';
+                    e.target.value = '';
+                });
+        });
+
+        // ── Render Bill ──
+        function renderBill() {
+            const now = new Date();
+            document.getElementById('billDate').textContent = now.toLocaleDateString('hi-IN');
+            document.getElementById('billTime').textContent = now.toLocaleTimeString('hi-IN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            const container = document.getElementById('billItems');
+            const totalEl = document.getElementById('totalAmount');
+            const countEl = document.getElementById('scanCount');
+
+            if (scannedItems.length === 0) {
+                container.innerHTML = `<div class="empty-bill">कोई आइटम नहीं — स्कैन करें।</div>`;
+                totalEl.textContent = '₹ 0.00';
+                countEl.textContent = '0 आइटम';
+                return;
+            }
+
+            let html = '';
+            let total = 0;
+            let totalQty = 0;
+
+            scannedItems.forEach((item, index) => {
+                const sub = item.price * item.qty;
+                total += sub;
+                totalQty += item.qty;
+                html += `
+                        <div class="bill-item">
+                            <div class="item-info">
+                                <strong>${escHtml(item.product)}</strong>
+                                <small>${escHtml(item.shop)} · ₹${item.price.toFixed(2)}</small>
+                            </div>
+                            <div class="item-actions">
+                                <div class="qty-controls">
+                                    <button class="qty-btn" data-index="${index}" data-delta="-1">−</button>
+                                    <span>${item.qty}</span>
+                                    <button class="qty-btn" data-index="${index}" data-delta="1">+</button>
+                                </div>
+                                <strong>₹${sub.toFixed(2)}</strong>
+                                <button class="del-btn" data-index="${index}">🗑️</button>
+                            </div>
+                        </div>
+                    `;
+            });
+
+            container.innerHTML = html;
+            totalEl.textContent = '₹ ' + total.toFixed(2);
+            countEl.textContent = totalQty + ' आइटम';
+
+            // Attach events
+            container.querySelectorAll('.qty-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const idx = parseInt(this.dataset.index);
+                    const delta = parseInt(this.dataset.delta);
+                    updateQty(idx, delta);
+                });
+            });
+            container.querySelectorAll('.del-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const idx = parseInt(this.dataset.index);
+                    deleteItem(idx);
+                });
+            });
+        }
+
+        function escHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                if (m === '"') return '&quot;';
+                return m;
+            });
+        }
+
+        function updateQty(i, change) {
+            if (i < 0 || i >= scannedItems.length) return;
+            scannedItems[i].qty += change;
+            if (scannedItems[i].qty <= 0) {
+                scannedItems.splice(i, 1);
+            }
+            saveAndRender();
+        }
+
+        function deleteItem(i) {
+            if (i < 0 || i >= scannedItems.length) return;
+            scannedItems.splice(i, 1);
+            saveAndRender();
+            showToast('🗑️ हटा दिया', 'info', 1200);
+        }
+
+        document.getElementById('clearBillBtn').addEventListener('click', () => {
+            if (scannedItems.length === 0) {
+                showToast('बिल पहले से खाली है', 'info', 1200);
+                return;
+            }
+            if (confirm('सभी आइटम हटाएँ?')) {
+                saveCurrentBill();
+                scannedItems = [];
+                saveAndRender();
+                showToast('🗑️ बिल साफ़ (इतिहास में सेव)', 'success', 1500);
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════
+        //  5.  BILL HISTORY (10-day storage)
+        // ═══════════════════════════════════════════════════════
+        function saveCurrentBill() {
+            if (scannedItems.length === 0) {
+                showToast('बिल खाली है', 'warning', 1500);
+                return;
+            }
+            const now = new Date();
+            const billData = {
+                items: JSON.parse(JSON.stringify(scannedItems)),
+                total: parseFloat(document.getElementById('totalAmount').textContent.replace('₹ ', '')),
+                date: now.toLocaleDateString('hi-IN'),
+                time: now.toLocaleTimeString('hi-IN', { hour: '2-digit', minute: '2-digit' }),
+                shopNames: [...new Set(scannedItems.map(i => i.shop))].join(', '),
+                createdAt: now.getTime()
+            };
+            let bills = JSON.parse(localStorage.getItem('my_bills')) || [];
+            bills.push(billData);
+            // Keep only last 10 days
+            const tenDays = 10 * 24 * 60 * 60 * 1000;
+            const cutoff = Date.now() - tenDays;
+            bills = bills.filter(b => b.createdAt > cutoff);
+            localStorage.setItem('my_bills', JSON.stringify(bills));
+            showToast('📁 बिल इतिहास में सेव', 'success', 2000);
+        }
+
+        // Cleanup on load
+        (function cleanupOldBills() {
+            let bills = JSON.parse(localStorage.getItem('my_bills')) || [];
+            const tenDays = 10 * 24 * 60 * 60 * 1000;
+            const cutoff = Date.now() - tenDays;
+            bills = bills.filter(b => b.createdAt > cutoff);
+            localStorage.setItem('my_bills', JSON.stringify(bills));
+        })();
+
+        // ═══════════════════════════════════════════════════════
+        //  6.  WHATSAPP SHARE
+        // ═══════════════════════════════════════════════════════
+        function shareBillToWhatsApp(phoneNumber, billDetailsText) {
+            const text = encodeURIComponent(`नमस्ते! आपका बिल:\n\n${billDetailsText}`);
+            const url = `https://wa.me/${phoneNumber}?text=${text}`;
+            window.open(url, '_blank');
+        }
+
+        document.getElementById('shareWhatsappBtn').addEventListener('click', () => {
+            if (scannedItems.length === 0) {
+                showToast('⚠️ बिल खाली है', 'error');
+                return;
+            }
+            let number = document.getElementById('whatsappNum').value.trim();
+            number = number.replace(/[^0-9]/g, '');
+            if (!number) {
+                showToast('⚠️ WhatsApp नंबर डालें', 'error');
+                return;
+            }
+            if (number.startsWith('0')) number = number.slice(1);
+            if (!number.startsWith('91')) number = '91' + number;
+
+            let msg = '🧾 *बिल विवरण*\n';
+            msg += `📅 ${document.getElementById('billDate').textContent}  ${document.getElementById('billTime').textContent}\n`;
+            msg += '─'.repeat(20) + '\n';
+            let total = 0;
+            scannedItems.forEach(item => {
+                const sub = item.price * item.qty;
+                total += sub;
+                msg += `${item.product} × ${item.qty}  ₹${sub.toFixed(2)}\n`;
+            });
+            msg += '─'.repeat(20) + '\n';
+            msg += `💰 *कुल: ₹${total.toFixed(2)}*\n`;
+            msg += '─'.repeat(20) + '\n🙏 धन्यवाद!';
+
+            saveCurrentBill();
+            shareBillToWhatsApp(number, msg);
+            showToast('📲 WhatsApp खुल रहा…', 'success', 2000);
+        });
+
+        // ═══════════════════════════════════════════════════════
+        //  7.  BLUETOOTH PRINTING (ESC/POS + TSPL)
+        // ═══════════════════════════════════════════════════════
+
+        // ── 7a. ESC/POS Receipt (58mm) ──
+        function buildESCPOS_Receipt(items, shopName = 'मेरी दुकान') {
+            const encoder = new TextEncoder();
+            const buffer = [];
+
+            // Init & width
+            buffer.push(0x1B, 0x40);
+            buffer.push(0x1D, 0x57, 0x30);
+
+            // Center, shop name bold + double height
+            buffer.push(0x1B, 0x61, 0x01);
+            buffer.push(0x1B, 0x45, 0x01);
+            buffer.push(0x1B, 0x21, 0x20);
+            const shopBytes = encoder.encode(shopName + '\n');
+            buffer.push(...shopBytes);
+            buffer.push(0x1B, 0x21, 0x00);
+            buffer.push(0x1B, 0x45, 0x00);
+
+            buffer.push(...encoder.encode('─'.repeat(24) + '\n'));
+            buffer.push(0x1B, 0x61, 0x00); // left align
+
+            let total = 0;
+            items.forEach(item => {
+                const line = item.product.padEnd(18) + ' x' + item.qty + '  ₹' + (item.price * item.qty).toFixed(2);
+                buffer.push(...encoder.encode(line + '\n'));
+                total += item.price * item.qty;
+            });
+
+            buffer.push(0x1B, 0x61, 0x01);
+            buffer.push(...encoder.encode('─'.repeat(24) + '\n'));
+            buffer.push(0x1B, 0x45, 0x01);
+            buffer.push(...encoder.encode('कुल: ₹' + total.toFixed(2) + '\n'));
+            buffer.push(0x1B, 0x45, 0x00);
+
+            buffer.push(...encoder.encode('\nधन्यवाद! आएँ फिर से!\n\n'));
+            buffer.push(0x1B, 0x64, 0x03);
+            buffer.push(0x1D, 0x56, 0x00);
+
+            return new Uint8Array(buffer);
+        }
+
+        // ── 7b. TSPL Sticker Label (50×30mm) ──
+        function buildTSPL_Label(productName, price, barcodeText, shopName = "Tamir Shop") {
+            const cmd = `
+        SIZE 50 mm, 30 mm
+        GAP 3 mm, 0
+        CLS
+        TEXT 200,20,"3",0,1,1,CENTER,"${shopName}"
+        TEXT 200,60,"2",0,1,1,CENTER,"${productName}"
+        TEXT 200,95,"3",0,1,1,CENTER,"MRP: RS ${price}"
+        BARCODE 200,135,"128",50,1,0,2,2,"${barcodeText}"
+        PRINT 1,1
+        `;
+            return new TextEncoder().encode(cmd);
+        }
+
+        // ── 7c. Bluetooth Send (chunked) ──
+        async function sendToBluetoothPrinter(byteData) {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [
+                        '000018f0-0000-1000-8000-00805f9b34fb',
+                        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+                        'e7810a71-73ae-499d-8c15-faa9aef0c3f2'
+                    ]
+                });
+
+                const server = await device.gatt.connect();
+                const services = await server.getPrimaryServices();
+                let targetChar = null;
+
+                for (const service of services) {
+                    const chars = await service.getCharacteristics();
+                    for (const ch of chars) {
+                        if (ch.properties.write || ch.properties.writeWithoutResponse) {
+                            targetChar = ch;
+                            break;
+                        }
+                    }
+                    if (targetChar) break;
+                }
+
+                if (!targetChar) {
+                    showToast('❌ प्रिंटर कैरेक्टरिस्टिक नहीं मिला!', 'error');
+                    return;
+                }
+
+                const chunkSize = 512;
+                for (let i = 0; i < byteData.length; i += chunkSize) {
+                    const chunk = byteData.slice(i, i + chunkSize);
+                    await targetChar.writeValue(chunk);
+                }
+
+                showToast('✅ प्रिंट सफलतापूर्वक भेजा गया!', 'success', 3000);
+            } catch (err) {
+                console.error('Bluetooth Print Error:', err);
+                showToast('⚠️ प्रिंट त्रुटि: ' + err.message, 'error', 4000);
+            }
+        }
+
+        // ── 7d. Event: Label Print (from QR Generator tab) ──
+        document.getElementById('printLabelBtn').addEventListener('click', async () => {
+            const shop = shopInput.value.trim() || 'Tamir Shop';
+            const product = productInput.value.trim() || 'Product';
+            const price = priceInput.value || '0';
+            const barcodeText = product.replace(/\s+/g, '') + '_' + price;
+
+            if (!product || price <= 0) {
+                showToast('⚠️ कृपया सही उत्पाद और मूल्य डालें', 'error');
+                return;
+            }
+
+            const labelBytes = buildTSPL_Label(product, price, barcodeText, shop);
+            await sendToBluetoothPrinter(labelBytes);
+        });
+
+        // ── 7e. Event: Receipt Print via BLE (from Scan tab) ──
+        document.getElementById('printReceiptBLEBtn').addEventListener('click', async () => {
+            if (scannedItems.length === 0) {
+                showToast('⚠️ बिल खाली है — पहले आइटम स्कैन करें', 'error');
+                return;
+            }
+            const shop = shopInput.value.trim() || 'मेरी दुकान';
+            const receiptBytes = buildESCPOS_Receipt(scannedItems, shop);
+            await sendToBluetoothPrinter(receiptBytes);
+        });
+
+        // ── 7f. Event: Regular Print (window.print) ──
+        document.getElementById('printBillBtn').addEventListener('click', () => {
+            if (scannedItems.length === 0) {
+                showToast('⚠️ बिल खाली है', 'error');
+                return;
+            }
+            saveCurrentBill();
+            window.print();
+        });
+
+        // ═══════════════════════════════════════════════════════
+        //  8.  KEYBOARD SHORTCUTS
+        // ═══════════════════════════════════════════════════════
+        document.querySelectorAll('#shopName, #productName, #productPrice').forEach(inp => {
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('generateQRBtn').click();
+                }
+            });
+        });
+
+        // ═══════════════════════════════════════════════════════
+        //  9.  INIT
+        // ═══════════════════════════════════════════════════════
+        renderBill();
+
+        window.addEventListener('beforeunload', () => {
+            if (html5QrCode && isScanning) {
+                try { html5QrCode.stop(); } catch (_) {}
+            }
+        });
+
+        console.log('🧾 QR Bill Pro ready ✅');
+        console.log('📦 Items:', scannedItems.length);
+        console.log('📁 Bills:', JSON.parse(localStorage.getItem('my_bills') || '[]').length);
+        console.log('📡 Bluetooth printing: ESC/POS (receipt) + TSPL (label)');
+    </script>
+</body>
+</html>
