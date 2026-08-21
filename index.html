@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+<title>🧾 स्मार्ट पॉस प्रो – अल्टीमेट बिलिंग सिस्टम</title>
+<!-- CDN लाइब्रेरीज -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+    body { background-color: #f0f2f5; margin: 0; padding: 10px; display: flex; justify-content: center; }
+    .pos-card { background: white; width: 100%; max-width: 520px; border-radius: 16px; padding: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: none; }
+    /* सिक्योरिटी स्क्रीन */
+    .security-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a202c; display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 16px; }
+    .security-card { background: white; border-radius: 16px; padding: 25px; max-width: 360px; width: 100%; text-align: center; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .title { font-size: 20px; font-weight: bold; color: #1a73e8; }
+    .tabs { display: flex; gap: 3px; background: #f1f3f4; padding: 4px; border-radius: 12px; margin-bottom: 12px; overflow-x: auto; }
+    .tab { flex: 1; padding: 8px 4px; font-size: 10px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; color: #5f6368; background: transparent; transition: 0.3s; white-space: nowrap; }
+    .tab.active { background: #1a73e8; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .section-box { border: 1px solid #dadce0; border-radius: 12px; padding: 12px; margin-bottom: 12px; background: #fff; }
+    .label { font-size: 12px; font-weight: bold; color: #3c4043; margin-bottom: 6px; display: block; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 8px; font-size: 13px; margin-bottom: 8px; outline: none; }
+    input:focus { border-color: #1a73e8; }
+    /* आइटम लिस्ट */
+    .item-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f3f4; font-size: 13px; }
+    .qty-controls { display: flex; align-items: center; gap: 5px; }
+    .qty-btn { width: 28px; height: 28px; border-radius: 5px; border: 1px solid #dadce0; background: #fff; cursor: pointer; font-weight: bold; }
+    /* बटन्स */
+    .btn-primary { background: #1a73e8; color: white; border: none; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; font-size: 13px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .btn-action { padding: 9px; border: none; border-radius: 8px; color: white; font-size: 12px; font-weight: bold; cursor: pointer; text-align: center; }
+    .btn-pdf { background: #17a2b8; }
+    .btn-wa { background: #25d366; }
+    .btn-print { background: #fd7e14; }
+    .btn-clear { background: #ea4335; }
+    .btn-scan { background: #6f42c1; width: 100%; margin-bottom: 6px; }
+    .btn-voice { background: #e83e8c; width: 100%; margin-bottom: 6px; }
+    .btn-bt { background: #3f51b5; width: 100%; margin-bottom: 6px; }
+    /* स्टॉक बैज */
+    .stock-badge { font-size: 10px; padding: 2px 6px; border-radius: 5px; font-weight: bold; }
+    .stock-ok { background: #e6f4ea; color: #1e8e3e; }
+    .stock-low { background: #fef7e0; color: #f9ab00; }
+    .stock-out { background: #fce8e6; color: #d93025; }
+    .scroll-list { max-height: 180px; overflow-y: auto; }
+    .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #323232; color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 10001; display: none; }
+</style>
+</head>
+<body>
+
+<!-- सुरक्षा स्क्रीन -->
+<div id="securityModal" class="security-overlay">
+    <div class="security-card">
+        <h2 style="margin-top:0;">🔒 सुरक्षा लॉगिन</h2>
+        <p style="color:#5f6368; font-size:13px;">ऐप खोलने के लिए पिन दर्ज करें</p>
+        <input type="password" id="accessCodeInput" placeholder="पिन दर्ज करें" style="text-align:center; font-size:16px; letter-spacing:5px;">
+        <button class="btn-primary" onclick="verifyAccessCode()">अनलॉक करें</button>
+    </div>
+</div>
+
+<!-- बारकोड स्कैनर मॉडल -->
+<div id="scannerModal" class="security-overlay" style="display:none; background:rgba(0,0,0,0.9);">
+    <div class="security-card" style="max-width:380px;">
+        <h3 style="margin-top:0;">📷 बारकोड स्कैन करें</h3>
+        <div id="reader" style="width:100%;"></div>
+        <button class="btn-primary btn-clear" style="margin-top:12px;" onclick="closeScanner()">स्कैन बंद करें</button>
+    </div>
+</div>
+
+<!-- क्विक ऐड मॉडल -->
+<div id="quickAddModal" class="security-overlay" style="display:none;">
+    <div class="security-card">
+        <h3 style="margin-top:0; color:#1a73e8;">✨ नया सामान जोड़ें</h3>
+        <p style="font-size:11px; color:#5f6368;" id="scanned-code-display"></p>
+        <input type="text" id="quick-item-name" placeholder="सामान का नाम">
+        <input type="number" id="quick-item-price" placeholder="कीमत (₹)">
+        <input type="number" id="quick-item-stock" placeholder="स्टॉक मात्रा" value="10">
+        <button class="btn-primary" onclick="saveQuickProduct()">सेव करें और जोड़ें</button>
+        <button class="btn-action btn-clear" style="width:100%; margin-top:6px;" onclick="closeQuickAdd()">रद्द करें</button>
+    </div>
+</div>
+
+<!-- टोस्ट संदेश -->
+<div id="toast" class="toast"></div>
+
+<!-- मुख्य ऐप -->
+<div class="pos-card" id="mainPosCard">
+    <div class="header">
+        <div class="title" id="app-title">🧾 Smart POS Pro</div>
+        <div style="display:flex; gap:6px; align-items:center;">
+            <select id="lang-selector" onchange="changeLanguage(this.value)" style="width:auto; padding:4px; font-size:11px; margin:0;">
+                <option value="hi">🇮🇳 हिंदी</option>
+                <option value="en">🇬🇧 English</option>
+            </select>
+            <div id="bt-status" style="font-size: 10px; font-weight: bold; color: #d93025;">🔴</div>
+        </div>
+    </div>
+
+    <!-- नेविगेशन टैब्स -->
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('billing-tab', this)" id="t-bill">🧮 बिलिंग</button>
+        <button class="tab" onclick="switchTab('items-tab', this)" id="t-inv">📦 इन्वेंट्री</button>
+        <button class="tab" onclick="switchTab('expense-tab', this)" id="t-exp">💸 खर्चे</button>
+        <button class="tab" onclick="switchTab('return-tab', this)" id="t-ret">🔄 वापसी</button>
+        <button class="tab" onclick="switchTab('pay-tab', this)" id="t-pay">💳 पेमेंट</button>
+        <button class="tab" onclick="switchTab('reports-tab', this)" id="t-rep">📊 रिपोर्ट्स</button>
+    </div>
+
+    <!-- 1. बिलिंग टैब -->
+    <div id="billing-tab" class="tab-content active">
+        <button class="btn-action btn-scan" onclick="startScanner()">📷 बारकोड स्कैनर खोलें</button>
+        <button class="btn-action btn-voice" onclick="startVoiceBilling()">🎙️ बोलकर जोड़ें (Voice Billing)</button>
+        <button class="btn-action btn-bt" onclick="connectBluetoothPrinter()">🖨️ ब्लूटूथ प्रिंटर कनेक्ट करें</button>
+        
+        <div class="section-box">
+            <span class="label" id="l-select-item">सामान चुनें</span>
+            <input type="text" id="prod-search" placeholder="नाम से खोजें..." oninput="filterProductDropdown()">
+            <select id="product-select" onchange="addSelectedProduct(this)">
+                <option value="">-- सामान चुनें --</option>
+            </select>
+        </div>
+
+        <div class="section-box">
+            <span class="label"><span id="l-cart-title">बिल लिस्ट</span> (<span id="item-count">0</span>)</span>
+            <div id="cart-items" class="scroll-list">
+                <p style="text-align:center;color:#999;font-size:12px;padding:15px;" id="l-no-item">कोई सामान नहीं जोड़ा गया</p>
+            </div>
+        </div>
+
+        <div class="section-box" style="background:#f8f9fa;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="font-weight:bold;" id="l-total">कुल योग:</span>
+                <span id="total-amount" style="font-size:18px; color:#1a73e8; font-weight:bold;">₹0.00</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+                <div>
+                    <span class="label">GST (%)</span>
+                    <select id="gst-select" onchange="calcTotals()">
+                        <option value="0">0%</option>
+                        <option value="5">5%</option>
+                        <option value="12" selected>12%</option>
+                        <option value="18">18%</option>
+                    </select>
+                </div>
+                <div>
+                    <span class="label" id="l-disc">छूट (%)</span>
+                    <input type="number" id="discount-input" value="0" oninput="calcTotals()">
+                </div>
+                <div>
+                    <span class="label" id="l-coupon">कूपन कोड</span>
+                    <input type="text" id="coupon-input" placeholder="CODE" oninput="calcTotals()" style="text-transform:uppercase;">
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn-action btn-pdf" onclick="generatePDF()">📥 PDF बिल</button>
+            <button class="btn-action btn-wa" onclick="sendWhatsApp()">💬 WhatsApp</button>
+            <button class="btn-action btn-print" onclick="printBluetoothReceipt()">🖨️ ब्लूटूथ प्रिंट</button>
+            <button class="btn-action btn-clear" onclick="clearCart()">🗑️ खाली करें</button>
+        </div>
+    </div>
+
+    <!-- 2. इन्वेंट्री टैब -->
+    <div id="items-tab" class="tab-content">
+        <div class="section-box">
+            <span class="label" id="l-add-new">नया सामान जोड़ें</span>
+            <input type="text" id="new-item-name" placeholder="सामान का नाम">
+            <input type="text" id="new-item-barcode" placeholder="बारकोड (वैकल्पिक)">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                <input type="number" id="new-item-price" placeholder="कीमत (₹)">
+                <input type="number" id="new-item-stock" placeholder="स्टॉक मात्रा">
+            </div>
+            <button class="btn-primary" onclick="addNewMasterProduct()">➕ लिस्ट में जोड़ें</button>
+        </div>
+        <div class="section-box">
+            <span class="label" id="l-stock-list">स्टॉक लिस्ट</span>
+            <div id="master-products-list" class="scroll-list"></div>
+            <hr>
+            <button class="btn-action btn-pdf" style="width:100%; margin-top:6px;" onclick="exportData()">💾 बैकअप लें (JSON)</button>
+            <label for="import-file" class="btn-action btn-print" style="display:block; width:100%; margin-top:6px; text-align:center; cursor:pointer;">📂 बैकअप लोड करें</label>
+            <input type="file" id="import-file" style="display:none;" onchange="importData(event)">
+        </div>
+    </div>
+
+    <!-- 3. खर्चे टैब (Expense Management) -->
+    <div id="expense-tab" class="tab-content">
+        <div class="section-box">
+            <span class="label">दुकान का नया खर्चा दर्ज करें</span>
+            <input type="text" id="expense-reason" placeholder="खर्चे का कारण (जैसे: चाय, बिजली बिल)">
+            <input type="number" id="expense-amount" placeholder="राशि (₹)">
+            <button class="btn-primary" onclick="addExpense()">खर्चा सेव करें</button>
+        </div>
+        <div class="section-box">
+            <span class="label">खर्चों की सूची</span>
+            <div id="expense-list" class="scroll-list"></div>
+        </div>
+    </div>
+
+    <!-- 4. वापसी टैब (Return & Refund) -->
+    <div id="return-tab" class="tab-content">
+        <div class="section-box">
+            <span class="label">सामान वापसी (Return / Refund)</span>
+            <input type="text" id="return-bill-id" placeholder="बिल आईडी दर्ज करें (जैसे: B-170...)">
+            <button class="btn-primary" onclick="processReturnItem()" style="background:#ea4335;">सामान स्टॉक में वापस लें</button>
+        </div>
+        <div class="section-box">
+            <span class="label">वापसी इतिहास</span>
+            <div id="return-history-list" class="scroll-list"></div>
+        </div>
+    </div>
+
+    <!-- 5. पेमेंट टैब -->
+    <div id="pay-tab" class="tab-content">
+        <div class="section-box" style="text-align: center;">
+            <span class="label" id="l-upi-title">ग्राहक से ऑनलाइन भुगतान लें</span>
+            <input type="text" id="upi-id" placeholder="UPI ID (e.g. dukaan@paytm)" style="text-align:center;">
+            <button class="btn-primary" onclick="generateUPIQRCode()" style="margin-bottom: 10px;">QR कोड बनाएं</button>
+            <div id="qrcode-container" style="display: flex; justify-content: center; margin: 10px 0;"></div>
+            <div id="upi-pay-text" style="font-weight: bold; color: #1a73e8; font-size: 14px;"></div>
+        </div>
+    </div>
+
+    <!-- 6. रिपोर्ट टैब -->
+    <div id="reports-tab" class="tab-content">
+        <div class="section-box" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; text-align:center;">
+            <div style="background:#e8f0fe; padding:10px; border-radius:10px;">
+                <div style="font-size:16px; font-weight:bold; color:#1a73e8;" id="today-sales">₹0</div>
+                <div style="font-size:10px;" id="l-rep-sales">आज की बिक्री</div>
+            </div>
+            <div style="background:#fce8e6; padding:10px; border-radius:10px;">
+                <div style="font-size:16px; font-weight:bold; color:#ea4335;" id="today-expenses">₹0</div>
+                <div style="font-size:10px;">कुल खर्चे</div>
+            </div>
+        </div>
+        
+        <!-- शिफ्ट क्लोजिंग / कैश मिलान -->
+        <div class="section-box" style="background:#f1f3f4; text-align:center;">
+            <span class="label">कैश काउंटर मिलान (Shift Closing)</span>
+            <div style="font-size:13px; margin-bottom:6px;">गल्ले में कुल नकद होना चाहिए: <b id="expected-cash" style="color:#1a73e8;">₹0</b></div>
+            <input type="number" id="actual-cash" placeholder="गल्ले में मौजूद असली कैश दर्ज करें" style="text-align:center;">
+            <button class="btn-primary" onclick="verifyShiftCash()" style="background:#34a853;">शिफ्ट बंद करें और मिलान करें</button>
+        </div>
+
+        <div class="section-box">
+            <span class="label" id="l-rep-bills">पुराने बिल</span>
+            <div id="bill-history-list" class="scroll-list"></div>
+        </div>
+    </div>
+</div>
+
+<!-- PDF प्रिव्यू -->
+<div id="pdf-bill-preview" style="display:none; padding:20px; font-family:monospace; background:white;"></div>
+
+<script>
+    const PIN = "tamir@lI00769";
+    let masterProducts = JSON.parse(localStorage.getItem('pos_master')) || [
+        { id: 1, name: 'चीनी / Sugar', barcode: '101', price: 40, stock: 50 },
+        { id: 2, name: 'चाय पत्ती / Tea', barcode: '102', price: 250, stock: 10 }
+    ];
+    let cart = [];
+    let billHistory = JSON.parse(localStorage.getItem('pos_history')) || [];
+    let expenseHistory = JSON.parse(localStorage.getItem('pos_expenses')) || [];
+    let returnHistory = JSON.parse(localStorage.getItem('pos_returns')) || [];
+    let html5QrCode = null;
+    let bluetoothDevice = null;
+    let bluetoothCharacteristic = null;
+    let tempScannedBarcode = "";
+    let currentLang = 'hi';
+
+    const translations = {
+        hi: {
+            title: "🧾 स्मार्ट पॉस प्रो",
+            bill: "🧮 बिलिंग", inv: "📦 इन्वेंट्री", exp: "💸 खर्चे", ret: "🔄 वापसी", pay: "💳 पेमेंट", rep: "📊 रिपोर्ट्स",
+            selectItem: "सामान चुनें", cartTitle: "बिल लिस्ट", noItem: "कोई सामान नहीं जोड़ा गया",
+            total: "कुल योग:", disc: "छूट (%)", coupon: "कूपन कोड", addNew: "नया सामान जोड़ें", stockList: "स्टॉक लिस्ट",
+            repSales: "आज की बिक्री", repBills: "पुराने बिल", upiTitle: "ग्राहक से ऑनलाइन भुगतान लें"
+        },
+        en: {
+            title: "🧾 Smart POS Pro",
+            bill: "🧮 Billing", inv: "📦 Inventory", exp: "💸 Expenses", ret: "🔄 Returns", pay: "💳 Payment", rep: "📊 Reports",
+            selectItem: "Select Item", cartTitle: "Cart List", noItem: "No items added",
+            total: "Total:", disc: "Disc (%)", coupon: "Coupon", addNew: "Add New Item", stockList: "Stock List",
+            repSales: "Today Sales", repBills: "Bill History", upiTitle: "Collect Online Payment"
+        }
+    };
+
+    function changeLanguage(lang) {
+        currentLang = lang;
+        const t = translations[lang];
+        document.getElementById('app-title').innerText = t.title;
+        document.getElementById('t-bill').innerText = t.bill;
+        document.getElementById('t-inv').innerText = t.inv;
+        document.getElementById('t-exp').innerText = t.exp;
+        document.getElementById('t-ret').innerText = t.ret;
+        document.getElementById('t-pay').innerText = t.pay;
+        document.getElementById('t-rep').innerText = t.rep;
+        document.getElementById('l-select-item').innerText = t.selectItem;
+        document.getElementById('l-cart-title').innerText = t.cartTitle;
+        document.getElementById('l-no-item').innerText = t.noItem;
+        document.getElementById('l-total').innerText = t.total;
+        document.getElementById('l-disc').innerText = t.disc;
+        document.getElementById('l-coupon').innerText = t.coupon;
+        document.getElementById('l-add-new').innerText = t.addNew;
+        document.getElementById('l-stock-list').innerText = t.stockList;
+        document.getElementById('l-rep-sales').innerText = t.repSales;
+        document.getElementById('l-rep-bills').innerText = t.repBills;
+        document.getElementById('l-upi-title').innerText = t.upiTitle;
+    }
+
+    function verifyAccessCode() {
+        const input = document.getElementById('accessCodeInput').value;
+        if (input === PIN) {
+            document.getElementById('securityModal').style.display = 'none';
+            document.getElementById('mainPosCard').style.display = 'block';
+            renderAll();
+        } else {
+            alert("गलत पिन!");
+        }
+    }
+
+    function renderAll() {
+        renderMasterList();
+        renderCart();
+        renderReports();
+        renderExpenses();
+        renderReturns();
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(() => t.style.display = 'none', 2000);
+    }
+
+    function renderMasterList() {
+        const list = document.getElementById('master-products-list');
+        const select = document.getElementById('product-select');
+        list.innerHTML = '';
+        select.innerHTML = '<option value="">-- सामान चुनें --</option>';
+        masterProducts.forEach((p, index) => {
+            const stockClass = p.stock <= 0 ? 'stock-out' : (p.stock < 5 ? 'stock-low' : 'stock-ok');
+            list.innerHTML += `
+                <div class="item-row">
+                    <div><b>${p.name}</b> <small>(${p.barcode || 'कोड नहीं'})</small><br><small>₹${p.price} | <span class="stock-badge ${stockClass}">स्टॉक: ${p.stock}</span></small></div>
+                    <button onclick="deleteProduct(${index})" style="background:none; border:none; color:red; cursor:pointer;">🗑️</button>
+                </div>
+            `;
+            if(p.stock > 0) {
+                select.innerHTML += `<option value="${index}">${p.name} (₹${p.price})</option>`;
+            }
+        });
+        localStorage.setItem('pos_master', JSON.stringify(masterProducts));
+    }
+
+    function filterProductDropdown() {
+        const filter = document.getElementById('prod-search').value.toLowerCase();
+        const select = document.getElementById('product-select');
+        const options = select.options;
+        for (let i = 1; i < options.length; i++) {
+            const txt = options[i].text.toLowerCase();
+            options[i].style.display = txt.includes(filter) ? "" : "none";
+        }
+    }
+
+    function addNewMasterProduct() {
+        const name = document.getElementById('new-item-name').value;
+        const barcode = document.getElementById('new-item-barcode').value || Date.now().toString();
+        const price = parseFloat(document.getElementById('new-item-price').value);
+        const stock = parseFloat(document.getElementById('new-item-stock').value);
+        if(name && price) {
+            masterProducts.push({ id: Date.now(), name, barcode, price, stock });
+            renderMasterList();
+            showToast("✅ सामान जोड़ा गया");
+            document.getElementById('new-item-name').value = '';
+            document.getElementById('new-item-barcode').value = '';
+            document.getElementById('new-item-price').value = '';
+            document.getElementById('new-item-stock').value = '';
+        }
+    }
+
+    function deleteProduct(idx) {
+        if(confirm("हटाएं?")) { masterProducts.splice(idx, 1); renderMasterList(); }
+    }
+
+    function addSelectedProduct(sel) {
+        const idx = sel.value;
+        if(idx === "") return;
+        addProductToCart(masterProducts[idx]);
+        sel.value = "";
+    }
+
+    function addProductToCart(p) {
+        const existing = cart.find(item => item.id === p.id);
+        if(existing) {
+            if(existing.qty < p.stock) existing.qty++;
+            else { showToast("❌ स्टॉक खत्म!"); return; }
+        } else {
+            cart.push({...p, qty: 1});
+        }
+        renderCart();
+        showToast(`➕ ${p.name} जोड़ा गया`);
+    }
+
+    // Voice Billing Feature
+    function startVoiceBilling() {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            alert("आपका ब्राउज़र वॉइस रिकग्निशन सपोर्ट नहीं करता है!");
+            return;
+        }
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'hi-IN';
+        showToast("🎙️ बोलिए, सामान का नाम सुन रहा हूँ...");
+        recognition.onresult = function(event) {
+            const speechResult = event.results[0][0].transcript.toLowerCase();
+            showToast(`सुना गया: ${speechResult}`);
+            const matched = masterProducts.find(m => speechResult.includes(m.name.toLowerCase()));
+            if(matched) {
+                addProductToCart(matched);
+            } else {
+                alert(`सामान "${speechResult}" इन्वेंट्री में नहीं मिला!`);
+            }
+        };
+        recognition.start();
+    }
+
+    // Scanner
+    function startScanner() {
+        document.getElementById('scannerModal').style.display = 'flex';
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 150 } },
+            (decodedText) => {
+                const found = masterProducts.find(m => m.barcode === decodedText);
+                if(found) {
+                    addProductToCart(found);
+                    closeScanner();
+                } else {
+                    closeScanner();
+                    tempScannedBarcode = decodedText;
+                    document.getElementById('scanned-code-display').innerText = `नया कोड: ${decodedText}`;
+                    document.getElementById('quickAddModal').style.display = 'flex';
+                }
+            }, (error) => {}
+        ).catch(err => { closeScanner(); });
+    }
+
+    function closeScanner() {
+        if(html5QrCode) {
+            html5QrCode.stop().then(() => { document.getElementById('scannerModal').style.display = 'none'; }).catch(() => { document.getElementById('scannerModal').style.display = 'none'; });
+        } else { document.getElementById('scannerModal').style.display = 'none'; }
+    }
+
+    function closeQuickAdd() { document.getElementById('quickAddModal').style.display = 'none'; }
+
+    function saveQuickProduct() {
+        const name = document.getElementById('quick-item-name').value;
+        const price = parseFloat(document.getElementById('quick-item-price').value);
+        const stock = parseFloat(document.getElementById('quick-item-stock').value) || 10;
+        if(!name || !price) { alert("कृपया नाम और कीमत भरें!"); return; }
+        const newProduct = { id: Date.now(), name: name, barcode: tempScannedBarcode, price: price, stock: stock };
+        masterProducts.push(newProduct);
+        renderMasterList();
+        closeQuickAdd();
+        addProductToCart(newProduct);
+        showToast("✅ नया सामान जोड़ लिया गया!");
+    }
+
+    // Expense Functions
+    function addExpense() {
+        const reason = document.getElementById('expense-reason').value;
+        const amount = parseFloat(document.getElementById('expense-amount').value);
+        if(!reason || !amount) { alert("कारण और राशि भरें!"); return; }
+        expenseHistory.unshift({ id: Date.now(), date: new Date().toLocaleDateString(), reason, amount });
+        localStorage.setItem('pos_expenses', JSON.stringify(expenseHistory));
+        document.getElementById('expense-reason').value = '';
+        document.getElementById('expense-amount').value = '';
+        renderExpenses();
+        renderReports();
+        showToast("💸 खर्चा जोड़ा गया");
+    }
+
+    function renderExpenses() {
+        const list = document.getElementById('expense-list');
+        list.innerHTML = expenseHistory.map(e => `
+            <div class="item-row">
+                <span><b>${e.reason}</b><br><small>${e.date}</small></span>
+                <span style="color:red; font-weight:bold;">-₹${e.amount}</span>
+            </div>
+        `).join('') || '<p style="text-align:center;color:#999;font-size:12px;">कोई खर्चा नहीं</p>';
+    }
+
+    // Return / Refund Functions
+    function processReturnItem() {
+        const billId = document.getElementById('return-bill-id').value.trim();
+        const bill = billHistory.find(b => b.id === billId);
+        if(!bill) { alert("मान्य बिल आईडी नहीं मिली!"); return; }
+        bill.items.forEach(i => {
+            const master = masterProducts.find(m => m.id === i.id);
+            if(master) master.stock += i.qty;
+        });
+        returnHistory.unshift({ id: billId, date: new Date().toLocaleDateString(), total: bill.total });
+        localStorage.setItem('pos_returns', JSON.stringify(returnHistory));
+        renderMasterList();
+        renderReturns();
+        document.getElementById('return-bill-id').value = '';
+        showToast("🔄 सामान स्टॉक में सफलतापूर्वक वापस ले लिया गया!");
+    }
+
+    function renderReturns() {
+        const list = document.getElementById('return-history-list');
+        list.innerHTML = returnHistory.map(r => `
+            <div class="item-row">
+                <span>बिल वापसी: <b>${r.id}</b><br><small>${r.date}</small></span>
+                <span style="color:green; font-weight:bold;">₹${r.total}</span>
+            </div>
+        `).join('') || '<p style="text-align:center;color:#999;font-size:12px;">कोई वापसी नहीं</p>';
+    }
+
+    // Bluetooth Printer
+    async function connectBluetoothPrinter() {
+        try {
+            bluetoothDevice = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
+            const server = await bluetoothDevice.gatt.connect();
+            const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+            bluetoothCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+            document.getElementById('bt-status').innerHTML = "🟢";
+            showToast("✅ प्रिंटर कनेक्टेड!");
+        } catch (error) { alert("ब्लूटूथ कनेक्शन विफल: " + error); }
+    }
+
+    async function printBluetoothReceipt() {
+        if(cart.length === 0 || !bluetoothCharacteristic) { alert("कार्ट खाली है या प्रिंटर कनेक्ट नहीं है!"); return; }
+        try {
+            let encoder = new TextEncoder();
+            let printData = "\x1B\x40\x1B\x61\x01SMART POS PRO\n-----------------\n\x1B\x61\x00";
+            cart.forEach(i => { printData += `${i.name} x${i.qty} - Rs.${i.price * i.qty}\n`; });
+            let total = calcTotals();
+            printData += `-----------------\nTOTAL: Rs.${total.toFixed(2)}\n\x1B\x61\x01Thank You!\n\n\n`;
+            await bluetoothCharacteristic.writeValue(encoder.encode(printData));
+            finalizeBill(total);
+            showToast("🖨️ प्रिंट हो गया!");
+        } catch (error) { alert("प्रिंट त्रुटि: " + error); }
+    }
+
+    function renderCart() {
+        const container = document.getElementById('cart-items');
+        document.getElementById('item-count').innerText = cart.length;
+        if(cart.length === 0) {
+            container.innerHTML = `<p style="text-align:center;color:#999;font-size:12px;padding:15px;">${translations[currentLang].noItem}</p>`;
+            calcTotals();
+            return;
+        }
+        container.innerHTML = '';
+        cart.forEach((item, idx) => {
+            container.innerHTML += `
+                <div class="item-row">
+                    <div><b>${item.name}</b><br><small>₹${item.price} x ${item.qty}</small></div>
+                    <div class="qty-controls">
+                        <button class="qty-btn" onclick="updateQty(${idx}, -1)">-</button>
+                        <span>${item.qty}</span>
+                        <button class="qty-btn" onclick="updateQty(${idx}, 1)">+</button>
+                        <button onclick="removeItem(${idx})" style="border:none; background:none; margin-left:8px;">❌</button>
+                    </div>
+                </div>
+            `;
+        });
+        calcTotals();
+    }
+
+    function updateQty(idx, delta) {
+        const item = cart[idx];
+        const master = masterProducts.find(m => m.id === item.id);
+        if(delta > 0 && item.qty >= master.stock) { showToast("❌ स्टॉक लिमिट!"); return; }
+        item.qty += delta;
+        if(item.qty <= 0) cart.splice(idx, 1);
+        renderCart();
+    }
+
+    function removeItem(idx) { cart.splice(idx, 1); renderCart(); }
+
+    function calcTotals() {
+        let subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const gst = parseFloat(document.getElementById('gst-select').value);
+        const disc = parseFloat(document.getElementById('discount-input').value) || 0;
+        const coupon = document.getElementById('coupon-input').value.trim().toUpperCase();
+        
+        let total = subtotal - (subtotal * disc / 100);
+        if(coupon === "DIWALI10") total = total * 0.9; // 10% extra festive discount
+        total = total + (total * gst / 100);
+        document.getElementById('total-amount').innerText = "₹" + total.toFixed(2);
+        return total;
+    }
+
+    function clearCart() { cart = []; renderCart(); }
+
+    function generateUPIQRCode() {
+        const upiId = document.getElementById('upi-id').value;
+        const total = calcTotals();
+        const container = document.getElementById('qrcode-container');
+        container.innerHTML = "";
+        if(!upiId || total <= 0) { alert("UPI ID और राशि जरूरी है!"); return; }
+        new QRCode(container, { text: `upi://pay?pa=${upiId}&pn=SmartPOS&am=${total.toFixed(2)}&cu=INR`, width: 160, height: 160 });
+        document.getElementById('upi-pay-text').innerText = `₹${total.toFixed(2)} भुगतान हेतु स्कैन करें`;
+    }
+
+    function finalizeBill(total) {
+        cart.forEach(item => {
+            const master = masterProducts.find(m => m.id === item.id);
+            if(master) master.stock -= item.qty;
+        });
+        const billId = "B-" + Date.now();
+        billHistory.unshift({ id: billId, date: new Date().toLocaleDateString(), total: total, items: [...cart] });
+        localStorage.setItem('pos_history', JSON.stringify(billHistory));
+        clearCart();
+        renderAll();
+    }
+
+    function generatePDF() {
+        if(cart.length === 0) return;
+        const total = calcTotals();
+        const billId = "B-" + Date.now();
+        const preview = document.getElementById('pdf-bill-preview');
+        preview.innerHTML = `
+            <center><h2>SMART POS PRO</h2><p>Bill ID: ${billId}</p><p>${new Date().toLocaleDateString()}</p></center>
+            <hr>
+            ${cart.map(i => `<div style="display:flex; justify-content:space-between;"><span>${i.name} x ${i.qty}</span><span>₹${i.price * i.qty}</span></div>`).join('')}
+            <hr>
+            <h3>Total: ₹${total.toFixed(2)}</h3>
+            <center><p>Thank You!</p></center>
+        `;
+        html2pdf().from(preview).save(`Bill_${billId}.pdf`).then(() => {
+            finalizeBill(total);
+            showToast("✅ PDF बिल सेव और स्टॉक अपडेटेड");
+        });
+    }
+
+    function renderReports() {
+        const today = new Date().toLocaleDateString();
+        const todaySales = billHistory.filter(b => b.date === today).reduce((s, b) => s + b.total, 0);
+        const todayExpenses = expenseHistory.filter(e => e.date === today).reduce((s, e) => s + e.amount, 0);
+        
+        document.getElementById('today-sales').innerText = "₹" + todaySales.toFixed(2);
+        document.getElementById('today-expenses').innerText = "₹" + todayExpenses.toFixed(2);
+        document.getElementById('expected-cash').innerText = "₹" + (todaySales - todayExpenses).toFixed(2);
+
+        const histList = document.getElementById('bill-history-list');
+        histList.innerHTML = billHistory.map(b => `
+            <div class="item-row">
+                <span>${b.date} - <b>₹${b.total.toFixed(2)}</b></span>
+                <small>${b.id}</small>
+            </div>
+        `).join('') || '<p style="text-align:center;color:#999;font-size:12px;">कोई पुराना बिल नहीं</p>';
+    }
+
+    function verifyShiftCash() {
+        const actual = parseFloat(document.getElementById('actual-cash').value);
+        const todaySales = billHistory.filter(b => b.date === new Date().toLocaleDateString()).reduce((s, b) => s + b.total, 0);
+        const todayExpenses = expenseHistory.filter(e => e.date === new Date().toLocaleDateString()).reduce((s, e) => s + e.amount, 0);
+        const expected = todaySales - todayExpenses;
+
+        if(isNaN(actual)) { alert("कृपया असली कैश राशि दर्ज करें!"); return; }
+        const diff = actual - expected;
+        if(diff === 0) alert("✅ गल्ला बिल्कुल सही है! मिलान सफल।");
+        else if(diff > 0) alert(`⚠️ गल्ले में ₹${diff} ज़्यादा हैं (Excess Cash)।`);
+        else alert(`❌ गल्ले में ₹${Math.abs(diff)} कम हैं (Shortage)।`);
+    }
+
+    function exportData() {
+        const data = { master: masterProducts, history: billHistory, expenses: expenseHistory };
+        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `backup_pos_${new Date().toLocaleDateString()}.json`;
+        a.click();
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = JSON.parse(e.target.result);
+            if(data.master) {
+                masterProducts = data.master;
+                billHistory = data.history || [];
+                expenseHistory = data.expenses || [];
+                renderAll();
+                showToast("📁 डेटा रिस्टोर सफल!");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function switchTab(id, btn) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    function sendWhatsApp() {
+        if(cart.length === 0) return;
+        let text = "*SMART POS PRO BILL*\n---\n";
+        cart.forEach(i => text += `${i.name} x ${i.qty} = ₹${i.price * i.qty}\n`);
+        text += `---\n*कुल योग: ₹${calcTotals()}*`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
+    }
+</script>
+</body>
+</html>
