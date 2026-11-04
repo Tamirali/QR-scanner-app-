@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete POS & Smart Sticker System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+        body { background: #e0f2f1; padding: 15px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        
+        .container { background: #fff; width: 100%; max-width: 500px; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        h2 { color: #00796b; text-align: center; margin-bottom: 15px; font-size: 20px; }
+        
+        .input-group { margin-bottom: 12px; width: 100%; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #444; }
+        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; outline: none; }
+        input:focus { border-color: #00796b; }
+        
+        button { background: #00796b; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 5px; transition: 0.3s; }
+        button:hover { background: #004d40; }
+        
+        .btn-print { background: #f57c00; margin-top: 15px; }
+        .btn-print:hover { background: #e65100; }
+
+        /* Sticker Output - Center Align Fix */
+        .output-section { border: 2px dashed #00796b; border-radius: 8px; padding: 15px; margin-top: 15px; background: #fafafa; display: none; flex-direction: column; align-items: center; justify-content: center; }
+        #qrcode, #barcode { display: flex; justify-content: center; margin-bottom: 10px; width: 100%; }
+        
+        /* Canvas ko center karne ke liye */
+        canvas { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+        
+        .details-box { background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 6px; font-weight: 600; font-size: 16px; color: #333; width: 100%; text-align: center; }
+
+        /* Scanner Section */
+        .scanner-tabs { display: flex; gap: 10px; margin-bottom: 15px; width: 100%; }
+        .scanner-tabs button { background: #78909c; margin-top: 0; padding: 10px 5px; font-size: 13px; }
+        .scanner-tabs button.active { background: #00796b; }
+        
+        #reader { width: 100% !important; border-radius: 10px; overflow: hidden; display: none; margin-bottom: 10px; }
+        
+        /* Cart Table */
+        .cart-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        .cart-table th, .cart-table td { border: 1px solid #ddd; padding: 10px 5px; text-align: center; }
+        .cart-table th { background: #00796b; color: white; }
+        .highlight-qty { color: #d32f2f; font-weight: bold; font-size: 15px; }
+        
+        .total-box { margin-top: 15px; padding: 12px; background: #004d40; color: white; text-align: center; font-size: 18px; font-weight: bold; border-radius: 6px; }
+
+        /* Print Media - Sirf Sticker Print Hoga */
+        @media print {
+            body * { visibility: hidden; }
+            .output-section, .output-section * { visibility: visible; }
+            .output-section { position: absolute; left: 0; top: 0; border: none; width: 100%; padding: 0; }
+            .btn-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SECTION 1: STICKER GENERATOR -->
+    <div class="container">
+        <h2>📦 Sticker & Code Generator</h2>
+        
+        <div class="input-group">
+            <label>Product Name & Price:</label>
+            <input type="text" id="product-name" placeholder="Jaise: Alu 1kg Rs/30" value="Alu 1kg Rs/30">
+        </div>
+
+        <div class="input-group">
+            <label>Unique Barcode Number (For Scanning):</label>
+            <input type="text" id="barcode-number" placeholder="Jaise: 1001" value="1001">
+        </div>
+
+        <button onclick="generateSticker()">Generate Sticker</button>
+
+        <div class="output-section" id="output-section">
+            <div id="qrcode" style="display: none;"></div>
+            <!-- Yahan Barcode banega -->
+            <svg id="barcode-svg"></svg> 
+            
+            <div class="details-box" id="display-title">Alu 1kg Rs/30</div>
+            <button class="btn-print" onclick="window.print()">🖨️ Print (Bluetooth/Thermal)</button>
+        </div>
+    </div>
+
+    <!-- SECTION 2: SMART POS SCANNER -->
+    <div class="container">
+        <h2>🛒 Billing Counter (POS)</h2>
+        
+        <div class="scanner-tabs">
+            <button id="tab-hardware" class="active" onclick="switchScanner('hardware')">⌨️ Hardware Scanner</button>
+            <button id="tab-camera" onclick="switchScanner('camera')">📷 Camera / Gallery</button>
+        </div>
+
+        <!-- Hardware Scanner Input -->
+        <div id="hardware-section">
+            <div class="input-group">
+                <label style="color:#00796b;">Barcode yahan scan karein (Enter dabayein):</label>
+                <input type="text" id="scan-input" placeholder="Scan barcode here..." autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Camera / Gallery Section -->
+        <div id="camera-section" style="display: none;">
+            <button onclick="startCamera()">📷 Open Camera to Scan</button>
+            <div id="reader"></div>
+            
+            <!-- Gallery Upload option -->
+            <div style="margin-top: 10px; text-align: center;">
+                <label for="gallery-input" style="display: inline-block; background: #455a64; color: white; padding: 10px 15px; border-radius: 6px; cursor: pointer; width: 100%; font-size: 14px;">
+                    🖼️ Upload Photo from Gallery
+                </label>
+                <input type="file" id="gallery-input" accept="image/*" style="display: none;" onchange="scanFromGallery(this)">
+            </div>
+        </div>
+
+        <table class="cart-table">
+            <thead>
+                <tr>
+                    <th>Barcode</th>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody id="cart-body">
+                <!-- Items yahan aayenge -->
+            </tbody>
+        </table>
+
+        <div class="total-box">
+            Total Bill: Rs <span id="grand-total">0</span>
+        </div>
+        <button style="background: #d32f2f;" onclick="clearCart()">Clear Cart</button>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. DATABASE & STICKER GENERATION LOGIC
+        // ==========================================
+        
+        // Dummy Database: Yahan aap apne saare products add kar sakte hain.
+        const productDatabase = {
+            "1001": { name: "Alu 1kg", price: 30 },
+            "1002": { name: "Pyaz 1kg", price: 40 },
+            "1003": { name: "Tamatar 1kg", price: 25 }
+        };
+
+        function generateSticker() {
+            const productName = document.getElementById("product-name").value.trim();
+            const barcodeNum = document.getElementById("barcode-number").value.trim();
+            
+            if (!productName || !barcodeNum) {
+                alert("Kripya Product Name aur Barcode Number dono dalein!");
+                return;
+            }
+
+            // Naye barcode ko database me save karein
+            let price = 30; 
+            const priceMatch = productName.match(/Rs\/(\d+)/);
+            if (priceMatch) price = parseInt(priceMatch[1]);
+
+            productDatabase[barcodeNum] = { name: productName, price: price };
+
+            document.getElementById("display-title").innerText = productName;
+            document.getElementById("output-section").style.display = "flex";
+
+            // Barcode generate karein (SVG format me taaki center me perfectly baithe)
+            try {
+                JsBarcode("#barcode-svg", barcodeNum, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 60,
+                    displayValue: true,
+                    fontSize: 14,
+                    margin: 10
+                });
+            } catch(e) {
+                alert("Barcode generate nahi hua. Sirf numbers dalein.");
+            }
+        }
+
+        // ==========================================
+        // 2. CART & BILLING LOGIC
+        // ==========================================
+        let cart = {};
+
+        function processScannedCode(barcode) {
+            barcode = barcode.trim();
+            if (!barcode) return;
+
+            const product = productDatabase[barcode];
+
+            if (!product) {
+                alert(`❌ Barcode "${barcode}" database mein nahi mila!\n\n(Pehle upar sticker generate karein)`);
+                return;
+            }
+
+            // --- SMART COUNTING LOGIC ---
+            if (cart[barcode]) {
+                cart[barcode].qty += 1;
+            } else {
+                cart[barcode] = {
+                    name: product.name,
+                    price: product.price,
+                    qty: 1
+                };
+            }
+
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            const cartBody = document.getElementById('cart-body');
+            const grandTotalEl = document.getElementById('grand-total');
+            cartBody.innerHTML = "";
+            let grandTotal = 0;
+
+            for (const barcode in cart) {
+                const item = cart[barcode];
+                const itemTotal = item.price * item.qty;
+                grandTotal += itemTotal;
+
+                // Agar qty 1 se zyada hai, toh red color dikhao
+                const qtyClass = item.qty > 1 ? 'highlight-qty' : '';
+
+                cartBody.innerHTML += `
+                    <tr>
+                        <td>${barcode}</td>
+                        <td>${item.name}</td>
+                        <td class="${qtyClass}">${item.qty}</td>
+                        <td>Rs ${item.price}</td>
+                        <td>Rs ${itemTotal}</td>
+                    </tr>
+                `;
+            }
+
+            grandTotalEl.innerText = grandTotal;
+        }
+
+        function clearCart() {
+            if(confirm("Kya aap cart clear karna chahte hain?")) {
+                cart = {};
+                updateCartUI();
+                document.getElementById('scan-input').focus();
+            }
+        }
+
+        // ==========================================
+        // 3. HARDWARE SCANNER LOGIC
+        // ==========================================
+        document.getElementById('scan-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const code = this.value;
+                this.value = "";
+                processScannedCode(code);
+            }
+        });
+
+        // ==========================================
+        // 4. CAMERA & GALLERY SCANNER LOGIC
+        // ==========================================
+        let html5QrCode = null;
+        let isScanning = false;
+
+        function switchScanner(type) {
+            document.getElementById('tab-hardware').classList.remove('active');
+            document.getElementById('tab-camera').classList.remove('active');
+            
+            if (type === 'hardware') {
+                document.getElementById('tab-hardware').classList.add('active');
+                document.getElementById('hardware-section').style.display = 'block';
+                document.getElementById('camera-section').style.display = 'none';
+                stopCamera();
+                document.getElementById('scan-input').focus();
+            } else {
+                document.getElementById('tab-camera').classList.add('active');
+                document.getElementById('hardware-section').style.display = 'none';
+                document.getElementById('camera-section').style.display = 'block';
+            }
+        }
+
+        function startCamera() {
+            if (isScanning) return;
+            
+            document.getElementById('reader').style.display = 'block';
+            html5QrCode = new Html5Qrcode("reader");
+            
+            // Camera configuration (Mobile view ke liye best)
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
+                processScannedCode(decodedText);
+                if (navigator.vibrate) navigator.vibrate(200); // Vibrate on success
+                
+                // Ek baar scan hone ke baad camera band kar dein taaki baar baar scan na ho
+                stopCamera(); 
+                
+            }).then(() => {
+                isScanning = true;
+            }).catch(err => {
+                alert("Camera start nahi ho paya. Kripya permission check karein.");
+                document.getElementById('reader').style.display = 'none';
+            });
+        }
+
+        function stopCamera() {
+            if (html5QrCode && isScanning) {
+                html5QrCode.stop().then(() => {
+                    isScanning = false;
+                    document.getElementById('reader').style.display = 'none';
+                }).catch(err => console.log(err));
+            }
+        }
+
+        // Gallery se photo scan karna
+        function scanFromGallery(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const html5QrCodeFile = new Html5Qrcode("reader");
+                
+                // Photo scan karein
+                html5QrCodeFile.scanFile(file, true)
+                    .then(decodedText => {
+                        processScannedCode(decodedText);
+                        input.value = ""; 
+                    })
+                    .catch(err => {
+                        alert("Photo mein koi valid Barcode/QR nahi mila. Kripya clear photo dalein.");
+                        input.value = "";
+                    });
+            }
+        }
+
+        // Page load par sticker generate karein aur scanner focus karein
+        window.onload = function() {
+            generateSticker();
+            document.getElementById('scan-input').focus();
+        };
+
+    </script>
+</body>
+</html>
