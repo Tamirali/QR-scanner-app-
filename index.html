@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Smart POS - दुकान बिलिंग</title>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", sans-serif; }
+body { background: #f2f4f8; color: #1a1a1a; padding-bottom: 70px; }
+header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; flex-wrap: wrap; gap: 6px; }
+header h1 { font-size: 18px; }
+.status { display: flex; gap: 6px; flex-wrap: wrap; }
+.badge { background: rgba(255,255,255,.2); padding: 4px 8px; border-radius: 12px; font-size: 11px; border: none; color: white; cursor: pointer; }
+.badge.offline { background: #dc2626; }
+.badge.online { background: #16a34a; }
+.tabs { display: flex; overflow-x: auto; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 56px; z-index: 9; }
+.tab { flex: 0 0 auto; padding: 12px 16px; border: none; background: none; font-size: 13px; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+.tab.active { color: #4f46e5; border-bottom-color: #4f46e5; font-weight: 600; }
+.tab-content { display: none; padding: 12px; }
+.tab-content.active { display: block; }
+.card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.card h2 { font-size: 15px; margin-bottom: 10px; color: #333; }
+input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 8px; font-size: 14px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row > * { flex: 1 1 100px; }
+.btn { padding: 10px 14px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; margin-top: 4px; }
+.btn.primary { background: #4f46e5; color: white; }
+.btn.success { background: #16a34a; color: white; }
+.btn.danger { background: #dc2626; color: white; }
+.btn:active { transform: scale(0.98); }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.list-item { background: #f9fafb; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #eef; font-size: 13px; gap: 8px; }
+.list-item .actions { display: flex; gap: 6px; flex-shrink: 0; }
+.list-item .actions button { padding: 4px 8px; font-size: 12px; border: none; border-radius: 6px; cursor: pointer; background: #e0e7ff; }
+.list-item .actions button.del { background: #fee2e2; }
+.total-row { display: flex; justify-content: space-between; padding: 12px 0; font-size: 16px; border-top: 2px dashed #ddd; margin-top: 10px; }
+.big-total { font-size: 32px; font-weight: 700; color: #16a34a; text-align: center; padding: 10px; }
+.scan-result { text-align: center; padding: 10px; background: #f0fdf4; border-radius: 8px; margin-top: 10px; font-size: 13px; word-break: break-all; }
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+.modal.active { display: flex; }
+.modal-box { background: white; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
+.modal-box h2 { margin-bottom: 14px; font-size: 16px; }
+.receipt { background: #fef9e7; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+#qrReader { width: 100%; max-width: 400px; margin: auto; }
+@media (min-width: 600px) { .tab-content { max-width: 600px; margin: 0 auto; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 Smart POS</h1>
+  <div class="status">
+    <button class="badge offline" id="printerStatus" onclick="connectPrinter()">🖨️ Printer Off</button>
+    <span class="badge" id="userStatus">👤 Guest</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="billing">🛍️ बिलिंग</button>
+  <button class="tab" data-tab="products">📦 प्रोडक्ट्स</button>
+  <button class="tab" data-tab="scan">📷 स्कैन</button>
+  <button class="tab" data-tab="reports">📊 रिपोर्ट</button>
+  <button class="tab" data-tab="admin">🔐 एडमिन</button>
+</nav>
+
+<section id="tab-billing" class="tab-content active">
+  <div class="card">
+    <h2>➕ आइटम जोड़ें</h2>
+    <select id="productSelect"><option value="">-- प्रोडक्ट चुनें --</option></select>
+    <div class="row">
+      <input type="number" id="qtyInput" placeholder="मात्रा" min="0.001" step="0.001" value="1">
+      <select id="unitSelect">
+        <option value="pcs">pcs</option>
+        <option value="kg">kg</option>
+        <option value="gm">gm</option>
+        <option value="ltr">ltr</option>
+      </select>
+      <button class="btn primary" onclick="addToCart()">जोड़ें</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>🛒 कार्ट</h2>
+    <div id="cartList" class="list"></div>
+    <div class="total-row">
+      <strong>कुल राशि:</strong>
+      <strong id="cartTotal">₹0.00</strong>
+    </div>
+    <div class="row">
+      <button class="btn success" onclick="completeBill()">✅ बिल पूरा करें</button>
+      <button class="btn danger" onclick="clearCart()">🗑️ कार्ट खाली</button>
+    </div>
+  </div>
+</section>
+
+<section id="tab-products" class="tab-content">
+  <div class="card">
+    <h2>➕ नया प्रोडक्ट जोड़ें</h2>
+    <input type="text" id="pName" placeholder="प्रोडक्ट का नाम">
+    <input type="number" id="pPrice" placeholder="प्रति यूनिट दाम (₹)" step="0.01">
+    <input type="text" id="pUnit" placeholder="यूनिट (pcs/kg/gm/ltr)" value="pcs">
+    <button class="btn primary" onclick="addProduct()">प्रोडक्ट जोड़ें</button>
+  </div>
+  <div class="card">
+    <h2>📦 प्रोडक्ट सूची</h2>
+    <div id="productList" class="list"></div>
+  </div>
+</section>
+
+<section id="tab-scan" class="tab-content">
+  <div class="card">
+    <h2>📷 स्कैनर</h2>
+    <div id="qrReader"></div>
+    <div class="row">
+      <button class="btn primary" onclick="startScan()">📸 कैमरा शुरू</button>
+      <button class="btn danger" onclick="stopScan()">⏹️ बंद करें</button>
+    </div>
+    <label style="display:block;margin-top:10px;font-size:13px;color:#555;">या गैलरी से इमेज चुनें:</label>
+    <input type="file" id="galleryInput" accept="image/*">
+    <p id="scanResult" class="scan-result">स्कैन परिणाम यहाँ दिखेगा</p>
+  </div>
+</section>
+
+<section id="tab-reports" class="tab-content">
+  <div class="card">
+    <h2>⏱️ पिछले 12 घंटे की बिक्री</h2>
+    <p class="big-total" id="total12h">₹0.00</p>
+  </div>
+  <div class="card">
+    <h2>📅 तारीख के हिसाब से कुल कमाई</h2>
+    <div id="dateWiseReport" class="list"></div>
+  </div>
+  <div class="card">
+    <h2>🧾 बिक्री इतिहास</h2>
+    <div id="salesHistory" class="list"></div>
+    <button class="btn danger" onclick="deleteHistory()">🗑️ इतिहास मिटाएं</button>
+  </div>
+</section>
+
+<section id="tab-admin" class="tab-content">
+  <div class="card">
+    <h2>🔐 एडमिन लॉगिन</h2>
+    <input type="password" id="adminPass" placeholder="एडमिन पासवर्ड">
+    <button class="btn primary" onclick="adminLogin()">लॉगिन</button>
+  </div>
+  <div class="card" id="adminPanel" style="display:none;">
+    <h2>👥 रजिस्टर्ड यूजर</h2>
+    <div id="userList" class="list"></div>
+    <hr style="margin:12px 0;">
+    <button class="btn danger" onclick="clearAllData()">⚠️ सारा डेटा मिटाएं</button>
+  </div>
+</section>
+
+<div id="verifyModal" class="modal">
+  <div class="modal-box">
+    <h2>🔒 सत्यापन आवश्यक</h2>
+    <input type="tel" id="verifyMobile" placeholder="मोबाइल नंबर (10 अंक)" maxlength="10">
+    <input type="password" id="verifyCode" placeholder="गुप्त सुरक्षा कोड">
+    <div class="row">
+      <button class="btn success" onclick="verifyUser()">✅ सत्यापित करें</button>
+      <button class="btn danger" onclick="closeVerify()">❌ रद्द करें</button>
+    </div>
+  </div>
+</div>
+
+<div id="receiptModal" class="modal">
+  <div class="modal-box">
+    <h2>🧾 बिल प्रीव्यू</h2>
+    <pre id="receiptPreview" class="receipt"></pre>
+    <div class="row">
+      <button class="btn primary" onclick="printReceipt()">🖨️ प्रिंट करें</button>
+      <button class="btn danger" onclick="closeReceipt()">बंद करें</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   SMART POS - Offline-first Shop Billing App (Single File)
+   ============================================================ */
+
+const SECRET_CODE = "712502";
+const ADMIN_PASS = "admin123";
+
+let db = null;
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("SmartPOS", 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains("products"))
+        d.createObjectStore("products", { keyPath: "id", autoIncrement: true });
+      if (!d.objectStoreNames.contains("sales"))
+        d.createObjectStore("sales", { keyPath: "id", autoIncrement: true });
+      if (!d.objectStoreNames.contains("users"))
+        d.createObjectStore("users", { keyPath: "mobile" });
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = e => reject(e.target.error);
+  });
+}
+function dbAdd(store, data) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readwrite");
+    const req = tx.objectStore(store).add(data);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbPut(store, data) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readwrite");
+    const req = tx.objectStore(store).put(data);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbGetAll(store) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbGet(store, key) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbDelete(store, key) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readwrite");
+    const req = tx.objectStore(store).delete(key);
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+function dbClear(store) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, "readwrite");
+    const req = tx.objectStore(store).clear();
+    req.onsuccess = () => res();
+    req.onerror = () => rej(req.error);
+  });
+}
+
+let cart = [];
+let currentUser = null;
+let verifiedForSession = false;
+let pendingVerifyAction = null;
+let bluetoothDevice = null;
+let bluetoothCharacteristic = null;
+let scanner = null;
+let currentReceiptSale = null;
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+function formatMoney(n) { return "₹" + Number(n).toFixed(2); }
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+/* ---------- VERIFICATION ---------- */
+function requireVerification(action) {
+  if (verifiedForSession) { action(); return; }
+  pendingVerifyAction = action;
+  document.getElementById("verifyModal").classList.add("active");
+}
+function closeVerify() {
+  document.getElementById("verifyModal").classList.remove("active");
+  pendingVerifyAction = null;
+  document.getElementById("verifyMobile").value = "";
+  document.getElementById("verifyCode").value = "";
+}
+async function verifyUser() {
+  const mobile = document.getElementById("verifyMobile").value.trim();
+  const code = document.getElementById("verifyCode").value.trim();
+  if (!/^\d{10}$/.test(mobile)) return alert("10 अंकों का मोबाइल नंबर डालें");
+  if (code !== SECRET_CODE) return alert("गुप्त कोड गलत है");
+  let user = await dbGet("users", mobile);
+  if (user && user.blocked) { alert("🚫 यह यूजर ब्लॉक है। एडमिन से संपर्क करें।"); return; }
+  if (!user) { user = { mobile, blocked: false, createdAt: Date.now() }; await dbPut("users", user); }
+  currentUser = user;
+  verifiedForSession = true;
+  localStorage.setItem("pos_current_mobile", mobile);
+  document.getElementById("userStatus").textContent = "👤 " + mobile.slice(-4);
+  document.getElementById("userStatus").classList.add("online");
+  closeVerify();
+  if (pendingVerifyAction) { const fn = pendingVerifyAction; pendingVerifyAction = null; fn(); }
+}
+
+/* ---------- PRODUCTS ---------- */
+function addProduct() {
+  requireVerification(async () => {
+    if (currentUser?.blocked) return alert("आप ब्लॉक हैं, प्रोडक्ट नहीं जोड़ सकते");
+    const name = document.getElementById("pName").value.trim();
+    const price = parseFloat(document.getElementById("pPrice").value);
+    const unit = document.getElementById("pUnit").value.trim() || "pcs";
+    if (!name || isNaN(price) || price <= 0) return alert("सही नाम और दाम डालें");
+    const product = { name, price, unit, createdAt: Date.now(), code: "P" + Date.now() };
+    await dbAdd("products", product);
+    document.getElementById("pName").value = "";
+    document.getElementById("pPrice").value = "";
+    await loadProducts();
+    await loadProductDropdown();
+    alert("✅ प्रोडक्ट जोड़ा गया");
+  });
+}
+async function loadProducts() {
+  const products = await dbGetAll("products");
+  const list = document.getElementById("productList");
+  list.innerHTML = products.length ? "" : "<p style='color:#888;font-size:13px;'>कोई प्रोडक्ट नहीं</p>";
+  products.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.innerHTML = `
+      <div>
+        <b>${escapeHtml(p.name)}</b><br>
+        <small>${formatMoney(p.price)} / ${p.unit}</small>
+      </div>
+      <div class="actions">
+        <button onclick='showCodes(${p.id})'>QR/Barcode</button>
+        <button onclick='printSticker(${p.id})'>🖨️</button>
+        <button class="del" onclick='deleteProduct(${p.id})'>🗑️</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+async function deleteProduct(id) {
+  if (!confirm("प्रोडक्ट हटाएं?")) return;
+  await dbDelete("products", id);
+  await loadProducts();
+  await loadProductDropdown();
+}
+async function loadProductDropdown() {
+  const products = await dbGetAll("products");
+  const sel = document.getElementById("productSelect");
+  sel.innerHTML = '<option value="">-- प्रोडक्ट चुनें --</option>';
+  products.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = `${p.name} - ${formatMoney(p.price)}/${p.unit}`;
+    opt.dataset.price = p.price;
+    opt.dataset.unit = p.unit;
+    opt.dataset.name = p.name;
+    sel.appendChild(opt);
+  });
+}
+async function showCodes(id) {
+  const p = await dbGet("products", id);
+  const modal = document.createElement("div");
+  modal.className = "modal active";
+  modal.innerHTML = `
+    <div class="modal-box">
+      <h2>${escapeHtml(p.name)}</h2>
+      <div style="text-align:center; margin-bottom:12px;">
+        <div id="qrGen" style="display:inline-block; padding:8px; background:#fff;"></div>
+        <p style="font-size:12px; margin-top:4px;">QR Code</p>
+      </div>
+      <div style="text-align:center; margin-bottom:12px; overflow-x:auto;">
+        <svg id="bcGen"></svg>
+        <p style="font-size:12px;">Barcode</p>
+      </div>
+      <button class="btn danger" onclick="this.closest('.modal').remove()">बंद करें</button>
+    </div>`;
+  document.body.appendChild(modal);
+  new QRCode(modal.querySelector("#qrGen"), { text: p.code, width: 150, height: 150 });
+  JsBarcode(modal.querySelector("#bcGen"), p.code, { format: "CODE128", width: 2, height: 60, displayValue: true });
+}
+
+/* ---------- CART ---------- */
+async function addToCart() {
+  const sel = document.getElementById("productSelect");
+  const id = sel.value;
+  if (!id) return alert("प्रोडक्ट चुनें");
+  const qty = parseFloat(document.getElementById("qtyInput").value);
+  const unit = document.getElementById("unitSelect").value;
+  if (!qty || qty <= 0) return alert("सही मात्रा डालें");
+  const opt = sel.selectedOptions[0];
+  const price = parseFloat(opt.dataset.price);
+  const productUnit = opt.dataset.unit;
+  const converted = convertQty(qty, unit, productUnit);
+  cart.push({
+    id: parseInt(id), name: opt.dataset.name, price,
+    qty, unit, productUnit,
+    lineTotal: price * converted
+  });
+  renderCart();
+  document.getElementById("qtyInput").value = "1";
+}
+function convertQty(qty, from, to) {
+  if (from === to) return qty;
+  if (from === "gm" && to === "kg") return qty / 1000;
+  if (from === "kg" && to === "gm") return qty * 1000;
+  if (from === "ltr" && to === "ml") return qty * 1000;
+  if (from === "ml" && to === "ltr") return qty / 1000;
+  return qty;
+}
+function renderCart() {
+  const list = document.getElementById("cartList");
+  list.innerHTML = cart.length ? "" : "<p style='color:#888;font-size:13px;'>कार्ट खाली है</p>";
+  let total = 0;
+  cart.forEach((item, i) => {
+    total += item.lineTotal;
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.innerHTML = `
+      <div>
+        <b>${escapeHtml(item.name)}</b><br>
+        <small>${item.qty} ${item.unit} × ${formatMoney(item.price)} = ${formatMoney(item.lineTotal)}</small>
+      </div>
+      <div class="actions"><button class="del" onclick="removeCartItem(${i})">✖</button></div>`;
+    list.appendChild(div);
+  });
+  document.getElementById("cartTotal").textContent = formatMoney(total);
+}
+function removeCartItem(i) { cart.splice(i, 1); renderCart(); }
+function clearCart() { cart = []; renderCart(); }
+
+function completeBill() {
+  if (!cart.length) return alert("कार्ट खाली है");
+  requireVerification(async () => {
+    if (currentUser?.blocked) return alert("आप ब्लॉक हैं");
+    const total = cart.reduce((s, i) => s + i.lineTotal, 0);
+    const sale = {
+      items: [...cart], total,
+      timestamp: Date.now(), date: todayStr(),
+      userMobile: currentUser?.mobile || "guest"
+    };
+    await dbAdd("sales", sale);
+    showReceipt(sale);
+    cart = [];
+    renderCart();
+    await loadReports();
+  });
+}
+
+/* ---------- RECEIPT ---------- */
+function showReceipt(sale) {
+  currentReceiptSale = sale;
+  const lines = [];
+  lines.push("        Smart POS Store");
+  lines.push("     ------------------------");
+  lines.push(`Date: ${new Date(sale.timestamp).toLocaleString()}`);
+  lines.push(`Bill: #${sale.timestamp.toString().slice(-6)}`);
+  lines.push("------------------------------");
+  sale.items.forEach(it => {
+    lines.push(`${it.name}`);
+    lines.push(`  ${it.qty} ${it.unit} x ${it.price} = ${it.lineTotal.toFixed(2)}`);
+  });
+  lines.push("------------------------------");
+  lines.push(`TOTAL: ${sale.total.toFixed(2)}`);
+  lines.push("");
+  lines.push("    धन्यवाद! फिर आएं 🙏");
+  document.getElementById("receiptPreview").textContent = lines.join("\n");
+  document.getElementById("receiptModal").classList.add("active");
+}
+function closeReceipt() { document.getElementById("receiptModal").classList.remove("active"); }
+
+async function printReceipt() {
+  if (!currentReceiptSale) return;
+  if (!bluetoothCharacteristic) {
+    if (!confirm("प्रिंटर कनेक्ट नहीं है। कनेक्ट करें?")) return;
+    await connectPrinter();
+    if (!bluetoothCharacteristic) return;
+  }
+  const s = currentReceiptSale;
+  const lines = [];
+  lines.push("     Smart POS Store\n");
+  lines.push("--------------------------------\n");
+  lines.push(new Date(s.timestamp).toLocaleString() + "\n");
+  lines.push("--------------------------------\n");
+  s.items.forEach(it => {
+    lines.push(`${it.name}\n`);
+    lines.push(` ${it.qty}${it.unit} x ${it.price} = ${it.lineTotal.toFixed(2)}\n`);
+  });
+  lines.push("--------------------------------\n");
+  lines.push(`TOTAL: ${s.total.toFixed(2)}\n`);
+  lines.push("\n धन्यवाद! 🙏\n\n\n");
+  await sendToPrinter(lines.join(""));
+  closeReceipt();
+}
+
+/* ---------- BLUETOOTH PRINTER ---------- */
+async function connectPrinter() {
+  if (!navigator.bluetooth) {
+    alert("इस ब्राउज़र में Web Bluetooth सपोर्ट नहीं है। Chrome (Android) में खोलें।");
+    return;
+  }
+  try {
+    bluetoothDevice = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [
+        "000018f0-0000-1000-8000-00805f9b34fb",
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
+        "49535343-fe7d-4ae5-8fa9-9fafd205e455"
+      ]
+    });
+    const server = await bluetoothDevice.gatt.connect();
+    let service = null;
+    for (const uuid of [
+      "000018f0-0000-1000-8000-00805f9b34fb",
+      "0000ff00-0000-1000-8000-00805f9b34fb",
+      "e7810a71-73ae-499d-8c15-faa9aef0c3f2",
+      "49535343-fe7d-4ae5-8fa9-9fafd205e455"
+    ]) {
+      try { service = await server.getPrimaryService(uuid); break; } catch (e) {}
+    }
+    if (!service) throw new Error("प्रिंटर सर्विस नहीं मिली");
+    const chars = await service.getCharacteristics();
+    bluetoothCharacteristic = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+    if (!bluetoothCharacteristic) throw new Error("Write characteristic नहीं मिली");
+    document.getElementById("printerStatus").textContent = "🖨️ Printer On";
+    document.getElementById("printerStatus").classList.add("online");
+    document.getElementById("printerStatus").classList.remove("offline");
+    alert("✅ प्रिंटर कनेक्ट हो गया");
+  } catch (err) {
+    console.error(err);
+    alert("प्रिंटर कनेक्ट नहीं हुआ: " + err.message);
+  }
+}
+async function sendToPrinter(text) {
+  if (!bluetoothCharacteristic) return;
+  const init = new Uint8Array([0x1B, 0x40]);
+  const textBytes = new TextEncoder().encode(text);
+  const cut = new Uint8Array([0x1D, 0x56, 0x00]);
+  const chunkSize = 20;
+  try {
+    await bluetoothCharacteristic.writeValue(init);
+    for (let i = 0; i < textBytes.length; i += chunkSize) {
+      await bluetoothCharacteristic.writeValue(textBytes.slice(i, i + chunkSize));
+      await new Promise(r => setTimeout(r, 20));
+    }
+    await bluetoothCharacteristic.writeValue(cut);
+  } catch (e) {
+    console.error(e);
+    alert("प्रिंट विफल: " + e.message);
+  }
+}
+async function printSticker(id) {
+  const p = await dbGet("products", id);
+  if (!bluetoothCharacteristic) {
+    if (!confirm("प्रिंटर कनेक्ट नहीं है। कनेक्ट करें?")) return;
+    await connectPrinter();
+    if (!bluetoothCharacteristic) return;
+  }
+  const text = `${p.name}\n${p.code}\n${formatMoney(p.price)}/${p.unit}\n\n\n`;
+  await sendToPrinter(text);
+}
+
+/* ---------- SCANNER ---------- */
+async function startScan() {
+  const reader = document.getElementById("qrReader");
+  reader.innerHTML = "";
+  scanner = new Html5Qrcode("qrReader");
+  try {
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      (decoded) => {
+        document.getElementById("scanResult").textContent = "✅ मिला: " + decoded;
+        handleScannedCode(decoded);
+      },
+      () => {}
+    );
+  } catch (e) {
+    alert("कैमरा शुरू नहीं हुआ: " + e.message);
+  }
+}
+async function stopScan() {
+  if (scanner) {
+    try { await scanner.stop(); scanner.clear(); } catch (e) {}
+    scanner = null;
+  }
+}
+document.getElementById("galleryInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (!scanner) scanner = new Html5Qrcode("qrReader");
+  try {
+    const result = await scanner.scanFile(file, true);
+    document.getElementById("scanResult").textContent = "✅ गैलरी से मिला: " + result;
+    handleScannedCode(result);
+  } catch (err) {
+    alert("इमेज में कोड नहीं मिला: " + err.message);
+  }
+});
+async function handleScannedCode(code) {
+  const products = await dbGetAll("products");
+  const found = products.find(p => p.code === code);
+  if (found) {
+    document.getElementById("productSelect").value = found.id;
+    document.getElementById("unitSelect").value = found.unit;
+    document.querySelector('.tab[data-tab="billing"]').click();
+    alert(`✅ ${found.name} चुना गया। मात्रा डालकर "जोड़ें" दबाएं।`);
+  } else {
+    alert("⚠️ यह कोड किसी प्रोडक्ट से मेल नहीं खाता: " + code);
+  }
+}
+
+/* ---------- REPORTS ---------- */
+async function loadReports() {
+  const sales = await dbGetAll("sales");
+  const now = Date.now();
+  const last12h = sales.filter(s => now - s.timestamp <= 12 * 3600 * 1000);
+  const total12 = last12h.reduce((sum, s) => sum + s.total, 0);
+  document.getElementById("total12h").textContent = formatMoney(total12);
+
+  const byDate = {};
+  sales.forEach(s => { byDate[s.date] = (byDate[s.date] || 0) + s.total; });
+  const dr = document.getElementById("dateWiseReport");
+  dr.innerHTML = "";
+  const dates = Object.keys(byDate).sort().reverse();
+  if (!dates.length) dr.innerHTML = "<p style='color:#888;font-size:13px;'>कोई बिक्री नहीं</p>";
+  dates.forEach(date => {
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.innerHTML = `<span>${date}</span><b>${formatMoney(byDate[date])}</b>`;
+    dr.appendChild(div);
+  });
+
+  const sh = document.getElementById("salesHistory");
+  sh.innerHTML = "";
+  if (!sales.length) sh.innerHTML = "<p style='color:#888;font-size:13px;'>कोई इतिहास नहीं</p>";
+  sales.slice().reverse().slice(0, 50).forEach(s => {
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.innerHTML = `
+      <div>
+        <b>${formatMoney(s.total)}</b><br>
+        <small>${new Date(s.timestamp).toLocaleString()}</small><br>
+        <small>${s.items.length} आइटम • ${s.userMobile}</small>
+      </div>
+      <div class="actions"><button onclick='viewSale(${s.id})'>देखें</button></div>`;
+    sh.appendChild(div);
+  });
+}
+async function viewSale(id) {
+  const sales = await dbGetAll("sales");
+  const s = sales.find(x => x.id === id);
+  if (s) showReceipt(s);
+}
+async function deleteHistory() {
+  if (!confirm("पूरा बिक्री इतिहास मिटाएं? यह वापस नहीं आएगा।")) return;
+  await dbClear("sales");
+  await loadReports();
+  alert("इतिहास मिटा दिया गया");
+}
+
+/* ---------- ADMIN ---------- */
+function adminLogin() {
+  const pass = document.getElementById("adminPass").value;
+  if (pass !== ADMIN_PASS) return alert("गलत पासवर्ड");
+  document.getElementById("adminPanel").style.display = "block";
+  loadUsers();
+}
+async function loadUsers() {
+  const users = await dbGetAll("users");
+  const ul = document.getElementById("userList");
+  ul.innerHTML = users.length ? "" : "<p style='color:#888;font-size:13px;'>कोई यूजर नहीं</p>";
+  users.forEach(u => {
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.innerHTML = `
+      <div>
+        <b>${u.mobile}</b><br>
+        <small>${u.blocked ? "🚫 Blocked" : "✅ Active"}</small>
+      </div>
+      <div class="actions">
+        <button onclick='toggleBlock("${u.mobile}")'>${u.blocked ? "🔓 Unblock" : "🚫 Block"}</button>
+      </div>`;
+    ul.appendChild(div);
+  });
+}
+async function toggleBlock(mobile) {
+  const u = await dbGet("users", mobile);
+  if (!u) return;
+  u.blocked = !u.blocked;
+  await dbPut("users", u);
+  if (currentUser && currentUser.mobile === mobile && u.blocked) {
+    currentUser = null;
+    verifiedForSession = false;
+    localStorage.removeItem("pos_current_mobile");
+    document.getElementById("userStatus").textContent = "👤 Guest";
+    document.getElementById("userStatus").classList.remove("online");
+  }
+  await loadUsers();
+}
+async function clearAllData() {
+  if (!confirm("⚠️ सारा डेटा (प्रोडक्ट, सेल्स, यूजर) मिटाएं? यह वापस नहीं आएगा।")) return;
+  if (!confirm("आखिरी बार पुष्टि करें: पूरा डेटा मिटाना है?")) return;
+  await dbClear("products");
+  await dbClear("sales");
+  await dbClear("users");
+  cart = []; currentUser = null; verifiedForSession = false;
+  localStorage.removeItem("pos_current_mobile");
+  renderCart();
+  await loadProducts();
+  await loadProductDropdown();
+  await loadReports();
+  await loadUsers();
+  document.getElementById("userStatus").textContent = "👤 Guest";
+  document.getElementById("userStatus").classList.remove("online");
+  alert("✅ सारा डेटा मिटा दिया गया");
+}
+
+/* ---------- INIT ---------- */
+(async function init() {
+  await openDB();
+  await loadProducts();
+  await loadProductDropdown();
+  await loadReports();
+  const savedMobile = localStorage.getItem("pos_current_mobile");
+  if (savedMobile) {
+    const u = await dbGet("users", savedMobile);
+    if (u && !u.blocked) {
+      currentUser = u;
+      document.getElementById("userStatus").textContent = "👤 " + u.mobile.slice(-4);
+      document.getElementById("userStatus").classList.add("online");
+    }
+  }
+  if (navigator.bluetooth) {
+    navigator.bluetooth.addEventListener("disconnect", () => {
+      bluetoothCharacteristic = null;
+      document.getElementById("printerStatus").textContent = "🖨️ Printer Off";
+      document.getElementById("printerStatus").classList.remove("online");
+      document.getElementById("printerStatus").classList.add("offline");
+    });
+  }
+})();
+</script>
+</body>
+</html>
