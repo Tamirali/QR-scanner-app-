@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>Sticker & Billing Pro</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="app-header">
+    <h1>🛒 Sticker & Billing</h1>
+    <div class="header-actions">
+      <button id="themeToggle" class="icon-btn" title="Theme">🌙</button>
+      <button id="btConnectBtn" class="btn-bt">🔗 प्रिंटर</button>
+    </div>
+  </header>
+
+  <!-- ===== TABS ===== -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="sticker">🏷️ स्टिकर</button>
+    <button class="tab" data-tab="scanner">📷 स्कैनर</button>
+    <button class="tab" data-tab="history">📜 हिस्ट्री</button>
+  </nav>
+
+  <!-- ============ STICKER MAKER ============ -->
+  <section id="sticker" class="tab-content active">
+    <div class="card">
+      <h2 id="formTitle">➕ नया प्रोडक्ट जोड़ें</h2>
+      <form id="productForm">
+        <input type="hidden" id="editId" />
+        <label>प्रोडक्ट का नाम *
+          <input type="text" id="pName" required placeholder="जैसे: Parle-G Biscuit" maxlength="40" />
+        </label>
+        <div class="row">
+          <label>कीमत (₹) *
+            <input type="number" id="pPrice" required min="0" step="0.01" placeholder="20" />
+          </label>
+          <label>कोड प्रकार
+            <select id="pType">
+              <option value="barcode">बारकोड</option>
+              <option value="qrcode">QR कोड</option>
+            </select>
+          </label>
+        </div>
+        <label>कोड मान (खाली = ऑटो)
+          <input type="text" id="pCode" placeholder="8901234567890" />
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" id="submitBtn">➕ सेव</button>
+          <button type="button" class="btn-secondary" id="cancelEdit" style="display:none">✖ रद्द</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>प्रोडक्ट्स (<span id="productCount">0</span>)</h2>
+        <input type="text" id="searchProduct" placeholder="🔍 खोजें..." class="search-inline" />
+      </div>
+      <div id="productList" class="product-grid"></div>
+    </div>
+  </section>
+
+  <!-- ============ SCANNER & BILLING ============ -->
+  <section id="scanner" class="tab-content">
+    <div class="card">
+      <h2>कोड स्कैन करें</h2>
+      <div class="scan-controls">
+        <button id="startCamera" class="btn-primary">📷 कैमरा</button>
+        <button id="stopCamera" class="btn-secondary">⏹️ रोकें</button>
+        <label class="btn-secondary file-btn">
+          🖼️ गैलरी
+          <input type="file" id="galleryInput" accept="image/*" hidden />
+        </label>
+        <button id="manualEntryBtn" class="btn-secondary">⌨️ मैनुअल</button>
+      </div>
+      <div id="reader" class="reader"></div>
+      <div id="scanResult" class="scan-result"></div>
+    </div>
+
+    <div class="card">
+      <h2>🧾 बिल</h2>
+      <div id="billList"></div>
+      <div class="bill-summary">
+        <div><span>सबटोटल:</span> <span>₹<span id="subTotal">0.00</span></span></div>
+        <div class="discount-row">
+          <label>डिस्काउंट (%):
+            <input type="number" id="discountPct" min="0" max="100" value="0" step="1" />
+          </label>
+          <label>GST (%):
+            <input type="number" id="gstPct" min="0" max="28" value="0" step="1" />
+          </label>
+        </div>
+        <div><span>डिस्काउंट:</span> -₹<span id="discAmt">0.00</span></div>
+        <div><span>GST:</span> +₹<span id="gstAmt">0.00</span></div>
+        <div class="grand-total"><strong>कुल:</strong> ₹<span id="billTotal">0.00</span></div>
+      </div>
+      <div class="bill-actions">
+        <button id="printBill" class="btn-primary">🖨️ प्रिंट</button>
+        <button id="saveBill" class="btn-secondary">💾 सेव</button>
+        <button id="clearBill" class="btn-danger">🗑️ साफ़</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section id="history" class="tab-content">
+    <div class="card">
+      <h2>📜 सेव किए गए बिल</h2>
+      <div id="historyList"></div>
+    </div>
+  </section>
+
+  <!-- ===== MANUAL ENTRY MODAL ===== -->
+  <div id="modalOverlay" class="modal-overlay">
+    <div class="modal">
+      <h3>मैनुअल कोड एंट्री</h3>
+      <input type="text" id="manualCode" placeholder="कोड डालें..." />
+      <div class="modal-actions">
+        <button id="manualOk" class="btn-primary">OK</button>
+        <button id="manualCancel" class="btn-secondary">रद्द</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST ===== -->
+  <div id="toast" class="toast"></div>
+
+  <!-- ===== LIBRARIES ===== -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- ===== APP ===== -->
+  <script src="js/utils.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/printer.js"></script>
+  <script src="js/app.js"></script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(console.warn);
+      });
+    }
+  </script>
+</body>
+</html>
